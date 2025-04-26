@@ -23,13 +23,7 @@ export interface Task {
    * but the user may *not* have marked the task as actually done. Such tasks are still
    * considered "active" for filtering purposes unless `ARCHIVED`, `CANCELLED`, or `deleted`.
    */
-  status?:
-    | "NEW"
-    | "SCHEDULED"
-    | "IN_PROGRESS"
-    | "COMPLETE"
-    | "CANCELLED"
-    | "ARCHIVED";
+  status?: "NEW" | "SCHEDULED" | "IN_PROGRESS" | "COMPLETE" | "CANCELLED" | "ARCHIVED";
   due?: string; // ISO 8601 format (e.g., "2025-04-22T03:44:52.081Z")
   snoozeUntil?: string; // ISO 8601 format
   eventColor?: string; // e.g., 'GRAPE', 'LAVENDER', 'GRAPHITE'
@@ -63,13 +57,7 @@ export interface TaskInputData {
   /**
    * Task status. See `Task` interface for notes on the `COMPLETE` status meaning.
    */
-  status?:
-    | "NEW"
-    | "SCHEDULED"
-    | "IN_PROGRESS"
-    | "COMPLETE"
-    | "CANCELLED"
-    | "ARCHIVED";
+  status?: "NEW" | "SCHEDULED" | "IN_PROGRESS" | "COMPLETE" | "CANCELLED" | "ARCHIVED";
   /** Deadline for the task. Handled by `parseDeadline` in API client. Can be number (days from now) or ISO/YYYY-MM-DD string. */
   deadline?: number | string;
   /** Date until task is snoozed. Handled by `parseDeadline` in API client. Can be number (days from now) or ISO/YYYY-MM-DD string. */

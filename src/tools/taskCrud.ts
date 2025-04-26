@@ -31,14 +31,7 @@ export function registerTaskCrudTools(server: McpServer): void {
       .optional(), // 1 chunk = 15 mins
     onDeck: z.boolean().optional(), // Prioritize task
     status: z
-      .enum([
-        "NEW",
-        "SCHEDULED",
-        "IN_PROGRESS",
-        "COMPLETE",
-        "CANCELLED",
-        "ARCHIVED",
-      ])
+      .enum(["NEW", "SCHEDULED", "IN_PROGRESS", "COMPLETE", "CANCELLED", "ARCHIVED"])
       .optional(),
     // Deadline: number of days from now OR ISO datetime string OR YYYY-MM-DD date string
     deadline: z
@@ -122,9 +115,7 @@ export function registerTaskCrudTools(server: McpServer): void {
       // Ensure we have at least one property to update besides taskId
       if (Object.keys(updateData).length === 0) {
         // Throw an error that wrapApiCall will catch and format
-        throw new Error(
-          "Update requires at least one field to change besides taskId.",
-        );
+        throw new Error("Update requires at least one field to change besides taskId.");
       }
 
       // Cast updateData to TaskInputData for the API client

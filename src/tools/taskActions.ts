@@ -19,10 +19,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
  */
 export function registerTaskActionTools(server: McpServer): void {
   // --- Common Schemas ---
-  const taskIdSchema = z
-    .number()
-    .int()
-    .positive("Task ID must be a positive integer.");
+  const taskIdSchema = z.number().int().positive("Task ID must be a positive integer.");
   const statusNote =
     "IMPORTANT NOTE: Tasks with 'status: COMPLETE' were NOT marked complete by the user. This means the user finished the initial block of time allocated to the task but did NOT finish the task. If asked to list all tasks or all active tasks, include each 'COMPLETE' task unless the user requests otherwise. Do NOT skip 'COMPLETE' tasks.";
   const getTaskStatusNote =
@@ -94,9 +91,7 @@ export function registerTaskActionTools(server: McpServer): void {
   server.tool(
     "reclaim_mark_complete",
     {
-      taskId: taskIdSchema.describe(
-        "The unique ID of the task to mark as complete.",
-      ),
+      taskId: taskIdSchema.describe("The unique ID of the task to mark as complete."),
     },
     async ({ taskId }) => wrapApiCall(api.markTaskComplete(taskId)),
     // .annotations({ description: "Mark a specific Reclaim.ai task as completed/done by the user." })
@@ -106,9 +101,7 @@ export function registerTaskActionTools(server: McpServer): void {
   server.tool(
     "reclaim_mark_incomplete",
     {
-      taskId: taskIdSchema.describe(
-        "The unique ID of the task to mark as incomplete (unarchive).",
-      ),
+      taskId: taskIdSchema.describe("The unique ID of the task to mark as incomplete (unarchive)."),
     },
     async ({ taskId }) => wrapApiCall(api.markTaskIncomplete(taskId)),
     // .annotations({ description: "Mark a specific Reclaim.ai task as incomplete (e.g., unarchive it)." })
@@ -127,17 +120,14 @@ export function registerTaskActionTools(server: McpServer): void {
   server.tool(
     "reclaim_add_time",
     {
-      taskId: taskIdSchema.describe(
-        "The unique ID of the task to add time to.",
-      ),
+      taskId: taskIdSchema.describe("The unique ID of the task to add time to."),
       minutes: z
         .number()
         .int()
         .positive("Minutes must be a positive integer.")
         .describe("Number of minutes to add to the task schedule."),
     },
-    async ({ taskId, minutes }) =>
-      wrapApiCall(api.addTimeToTask(taskId, minutes)),
+    async ({ taskId, minutes }) => wrapApiCall(api.addTimeToTask(taskId, minutes)),
     // .annotations({ description: "Add scheduled time (in minutes) to a specific Reclaim.ai task." })
   );
 
@@ -145,9 +135,7 @@ export function registerTaskActionTools(server: McpServer): void {
   server.tool(
     "reclaim_start_timer",
     {
-      taskId: taskIdSchema.describe(
-        "The unique ID of the task to start the timer for.",
-      ),
+      taskId: taskIdSchema.describe("The unique ID of the task to start the timer for."),
     },
     async ({ taskId }) => wrapApiCall(api.startTaskTimer(taskId)),
     // .annotations({ description: "Start the live timer for a specific Reclaim.ai task." })
@@ -157,9 +145,7 @@ export function registerTaskActionTools(server: McpServer): void {
   server.tool(
     "reclaim_stop_timer",
     {
-      taskId: taskIdSchema.describe(
-        "The unique ID of the task to stop the timer for.",
-      ),
+      taskId: taskIdSchema.describe("The unique ID of the task to stop the timer for."),
     },
     async ({ taskId }) => wrapApiCall(api.stopTaskTimer(taskId)),
     // .annotations({ description: "Stop the live timer for a specific Reclaim.ai task." })
@@ -169,9 +155,7 @@ export function registerTaskActionTools(server: McpServer): void {
   server.tool(
     "reclaim_log_work",
     {
-      taskId: taskIdSchema.describe(
-        "The unique ID of the task to log work against.",
-      ),
+      taskId: taskIdSchema.describe("The unique ID of the task to log work against."),
       minutes: z
         .number()
         .int()
@@ -192,8 +176,7 @@ export function registerTaskActionTools(server: McpServer): void {
           "Optional end time/date of the work log (ISO 8601 or YYYY-MM-DD). Defaults to now.",
         ),
     },
-    async ({ taskId, minutes, end }) =>
-      wrapApiCall(api.logWorkForTask(taskId, minutes, end)),
+    async ({ taskId, minutes, end }) => wrapApiCall(api.logWorkForTask(taskId, minutes, end)),
     // .annotations({ description: "Log completed work time (in minutes) against a specific Reclaim.ai task." })
   );
 

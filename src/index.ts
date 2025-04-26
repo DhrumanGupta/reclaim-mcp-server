@@ -50,9 +50,7 @@ async function main(): Promise<void> {
 
   // Crucial check: Ensure the API token is loaded.
   if (!process.env.RECLAIM_API_KEY) {
-    console.error(
-      "FATAL ERROR: RECLAIM_API_KEY environment variable is not set.",
-    );
+    console.error("FATAL ERROR: RECLAIM_API_KEY environment variable is not set.");
     console.error(
       "Please ensure a .env file exists in the project root and contains your Reclaim.ai API token.",
     );
@@ -75,10 +73,7 @@ async function main(): Promise<void> {
     registerTaskResources(server);
     console.error("All tools and resources registered successfully.");
   } catch (registrationError) {
-    console.error(
-      "FATAL ERROR during feature registration:",
-      registrationError,
-    );
+    console.error("FATAL ERROR during feature registration:", registrationError);
     process.exit(1);
   }
 
@@ -95,10 +90,7 @@ async function main(): Promise<void> {
       `✅ ${serverInfo.name} is running and connected via stdio. Listening for MCP messages on stdin...`,
     );
   } catch (connectionError) {
-    console.error(
-      "FATAL ERROR: Failed to connect MCP server to stdio transport:",
-      connectionError,
-    );
+    console.error("FATAL ERROR: Failed to connect MCP server to stdio transport:", connectionError);
     process.exit(1);
   }
 }

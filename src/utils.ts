@@ -5,10 +5,7 @@
 // Import necessary types from the SDK and local types
 import { ReclaimError } from "./types/reclaim.js"; // Fixed import path with .js extension
 
-import type {
-  CallToolResult,
-  TextContent,
-} from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult, TextContent } from "@modelcontextprotocol/sdk/types.js";
 
 /**
  * Wraps an API call promise, formatting the result or error into an MCP ToolResult structure.
@@ -18,9 +15,7 @@ import type {
  * @param promise - The promise returned by a `reclaim-client` API function.
  * @returns A Promise resolving to the SDK's `CallToolResult`.
  */
-export async function wrapApiCall(
-  promise: Promise<unknown>,
-): Promise<CallToolResult> {
+export async function wrapApiCall(promise: Promise<unknown>): Promise<CallToolResult> {
   try {
     const result = await promise;
 
@@ -28,9 +23,7 @@ export async function wrapApiCall(
 
     // Handle successful void promises (e.g., from deleteTask)
     if (result === undefined) {
-      contentParts = [
-        { type: "text", text: JSON.stringify({ success: true }, null, 2) },
-      ];
+      contentParts = [{ type: "text", text: JSON.stringify({ success: true }, null, 2) }];
     } else {
       // Attempt to stringify complex objects, otherwise return simple types as string
       const resultText =
