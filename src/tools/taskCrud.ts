@@ -7,8 +7,8 @@ import { z } from "zod";
 import * as api from "../reclaim-client.js";
 import { wrapApiCall } from "../utils.js";
 
-import type { TaskInputData } from "../types/reclaim.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { TaskInputData } from "../types/reclaim.js";
 
 /**
  * Registers task creation and update tools with the provided MCP Server instance.

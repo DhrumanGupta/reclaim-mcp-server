@@ -73,7 +73,10 @@ export function parseDeadline(deadlineInput: number | string | undefined): strin
       if (isNaN(parsed.getTime())) {
         // Handle potential simple date format like YYYY-MM-DD by assuming start of day UTC
         if (/^\d{4}-\d{2}-\d{2}$/.test(deadlineInput)) {
-          const [year, month, day] = deadlineInput.split("-").map(Number);
+          const parts = deadlineInput.split("-").map(Number);
+          const year = parts[0] ?? 0;
+          const month = parts[1] ?? 1;
+          const day = parts[2] ?? 1;
           // Month is 0-indexed in Date.UTC
           const utcDate = new Date(Date.UTC(year, month - 1, day));
           if (!isNaN(utcDate.getTime())) {

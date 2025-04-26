@@ -81,7 +81,9 @@ export class ReclaimError extends Error {
   constructor(message: string, status?: number, detail?: any) {
     super(message);
     this.name = "ReclaimError";
-    this.status = status;
+    if (status !== undefined) {
+      this.status = status;
+    }
     this.detail = detail;
 
     // Maintains proper stack trace in V8 environments (Node.js)
