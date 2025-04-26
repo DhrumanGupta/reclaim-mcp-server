@@ -38,12 +38,12 @@ export interface Task {
   index?: number; // Internal sorting index?
   alwaysPrivate?: boolean; // Should event always be private on calendar?
   sortKey?: number; // Internal sorting key?
-  taskSource?: { type: string; [key: string]: any }; // Origin (e.g., RECLAIM_APP, GOOGLE_CALENDAR)
+  taskSource?: { type: string; [key: string]: unknown }; // Origin (e.g., RECLAIM_APP, GOOGLE_CALENDAR)
   readOnlyFields?: string[]; // Fields that cannot be modified
   type?: "TASK" | "HABIT"; // Type of item
   recurringAssignmentType?: string; // How recurrence is handled
   // Allow for additional properties not explicitly defined, as API might add fields
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface TaskInputData {
@@ -76,9 +76,9 @@ export interface TaskInputData {
  */
 export class ReclaimError extends Error {
   status?: number;
-  detail?: any;
+  detail?: unknown;
 
-  constructor(message: string, status?: number, detail?: any) {
+  constructor(message: string, status?: number, detail?: unknown) {
     super(message);
     this.name = "ReclaimError";
     if (status !== undefined) {

@@ -48,10 +48,9 @@ export function registerTaskActionTools(server: McpServer): void {
       const processedTasksPromise = allTasksPromise.then((tasks) => {
         if (filter === "active") {
           return api.filterActiveTasks(tasks);
-        } else {
-          // filter === 'all'
-          return tasks;
         }
+        // filter === 'all'
+        return tasks;
       });
 
       // Wrap the API call and add the explanatory note to the output content

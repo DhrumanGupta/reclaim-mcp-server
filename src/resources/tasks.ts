@@ -3,6 +3,7 @@
  * Currently includes a resource for listing active tasks.
  */
 
+import { logger } from "../logger.js"; // Import the logger utility
 import * as api from "../reclaim-client.js";
 import { ReclaimError } from "../types/reclaim.js"; // Ensure .js extension if needed by module system
 
@@ -60,7 +61,7 @@ async function wrapResourceCall(
     }
 
     // Log the detailed error server-side
-    console.error(
+    logger.error(
       `MCP Resource Error (URI: ${uri}): ${errorMessage}`,
       errorDetail ? `\nDetail: ${errorDetail}` : "",
     );
