@@ -5,10 +5,26 @@
 
 import { z } from "zod";
 
-import * as api from "../reclaim-client.js";
+import * as defaultApi from "../reclaim-client.js";
 import { wrapApiCall } from "../utils.js"; // Import the centralized helper
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+
+// Define type for the API client to support dependency injection
+type ReclaimApiClient = {
+  listTasks: typeof defaultApi.listTasks;
+  getTask: typeof defaultApi.getTask;
+  markTaskComplete: typeof defaultApi.markTaskComplete;
+  markTaskIncomplete: typeof defaultApi.markTaskIncomplete;
+  deleteTask: typeof defaultApi.deleteTask;
+  addTimeToTask: typeof defaultApi.addTimeToTask;
+  startTaskTimer: typeof defaultApi.startTaskTimer;
+  stopTaskTimer: typeof defaultApi.stopTaskTimer;
+  logWorkForTask: typeof defaultApi.logWorkForTask;
+  clearTaskExceptions: typeof defaultApi.clearTaskExceptions;
+  prioritizeTask: typeof defaultApi.prioritizeTask;
+  filterActiveTasks: typeof defaultApi.filterActiveTasks;
+};
 
 /**
  * Registers all task action-related tools with the provided MCP Server instance.
@@ -16,8 +32,12 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
  * Uses the (name, schema, handler) signature for server.tool.
  *
  * @param server - The McpServer instance to register tools against.
+ * @param apiClient - Optional API client for dependency injection (used in testing)
  */
-export function registerTaskActionTools(server: McpServer): void {
+export function registerTaskActionTools(
+  server: McpServer,
+  apiClient: ReclaimApiClient = defaultApi,
+): void {
   // --- Common Schemas ---
   const taskIdSchema = z.number().int().positive("Task ID must be a positive integer.");
   const statusNote =
@@ -42,12 +62,12 @@ export function registerTaskActionTools(server: McpServer): void {
     },
     // Async handler function
     async ({ filter }) => {
-      const allTasksPromise = api.listTasks();
+      const allTasksPromise = apiClient.listTasks();
 
       // Conditionally apply filter based on input
       const processedTasksPromise = allTasksPromise.then((tasks) => {
         if (filter === "active") {
-          return api.filterActiveTasks(tasks);
+          return apiClient.filterActiveTasks(tasks);
         }
         // filter === 'all'
         return tasks;
@@ -74,7 +94,7 @@ export function registerTaskActionTools(server: McpServer): void {
     // Async handler function using wrapApiCall
     async ({ taskId }) => {
       // Wrap the API call and add the explanatory note to the output content
-      const result = await wrapApiCall(api.getTask(taskId));
+      const result = await wrapApiCall(apiClient.getTask(taskId));
       if (!result.isError && result.content) {
         result.content.push({
           type: "text",
@@ -92,7 +112,7 @@ export function registerTaskActionTools(server: McpServer): void {
     {
       taskId: taskIdSchema.describe("The unique ID of the task to mark as complete."),
     },
-    async ({ taskId }) => wrapApiCall(api.markTaskComplete(taskId)),
+    async ({ taskId }) => wrapApiCall(apiClient.markTaskComplete(taskId)),
     // .annotations({ description: "Mark a specific Reclaim.ai task as completed/done by the user." })
   );
 
@@ -102,7 +122,7 @@ export function registerTaskActionTools(server: McpServer): void {
     {
       taskId: taskIdSchema.describe("The unique ID of the task to mark as incomplete (unarchive)."),
     },
-    async ({ taskId }) => wrapApiCall(api.markTaskIncomplete(taskId)),
+    async ({ taskId }) => wrapApiCall(apiClient.markTaskIncomplete(taskId)),
     // .annotations({ description: "Mark a specific Reclaim.ai task as incomplete (e.g., unarchive it)." })
   );
 
@@ -110,7 +130,7 @@ export function registerTaskActionTools(server: McpServer): void {
   server.tool(
     "reclaim_delete_task",
     { taskId: taskIdSchema.describe("The unique ID of the task to delete.") },
-    async ({ taskId }) => wrapApiCall(api.deleteTask(taskId)),
+    async ({ taskId }) => wrapApiCall(apiClient.deleteTask(taskId)),
     // Consider adding destructiveHint=true via annotations if needed by clients
     // .annotations({ description: "Permanently delete a specific Reclaim.ai task.", destructiveHint: true });
   );
@@ -126,7 +146,7 @@ export function registerTaskActionTools(server: McpServer): void {
         .positive("Minutes must be a positive integer.")
         .describe("Number of minutes to add to the task schedule."),
     },
-    async ({ taskId, minutes }) => wrapApiCall(api.addTimeToTask(taskId, minutes)),
+    async ({ taskId, minutes }) => wrapApiCall(apiClient.addTimeToTask(taskId, minutes)),
     // .annotations({ description: "Add scheduled time (in minutes) to a specific Reclaim.ai task." })
   );
 
@@ -136,7 +156,7 @@ export function registerTaskActionTools(server: McpServer): void {
     {
       taskId: taskIdSchema.describe("The unique ID of the task to start the timer for."),
     },
-    async ({ taskId }) => wrapApiCall(api.startTaskTimer(taskId)),
+    async ({ taskId }) => wrapApiCall(apiClient.startTaskTimer(taskId)),
     // .annotations({ description: "Start the live timer for a specific Reclaim.ai task." })
   );
 
@@ -146,7 +166,7 @@ export function registerTaskActionTools(server: McpServer): void {
     {
       taskId: taskIdSchema.describe("The unique ID of the task to stop the timer for."),
     },
-    async ({ taskId }) => wrapApiCall(api.stopTaskTimer(taskId)),
+    async ({ taskId }) => wrapApiCall(apiClient.stopTaskTimer(taskId)),
     // .annotations({ description: "Stop the live timer for a specific Reclaim.ai task." })
   );
 
@@ -175,7 +195,7 @@ export function registerTaskActionTools(server: McpServer): void {
           "Optional end time/date of the work log (ISO 8601 or YYYY-MM-DD). Defaults to now.",
         ),
     },
-    async ({ taskId, minutes, end }) => wrapApiCall(api.logWorkForTask(taskId, minutes, end)),
+    async ({ taskId, minutes, end }) => wrapApiCall(apiClient.logWorkForTask(taskId, minutes, end)),
     // .annotations({ description: "Log completed work time (in minutes) against a specific Reclaim.ai task." })
   );
 
@@ -187,7 +207,7 @@ export function registerTaskActionTools(server: McpServer): void {
         "The unique ID of the task whose scheduling exceptions should be cleared.",
       ),
     },
-    async ({ taskId }) => wrapApiCall(api.clearTaskExceptions(taskId)),
+    async ({ taskId }) => wrapApiCall(apiClient.clearTaskExceptions(taskId)),
     // .annotations({ description: "Clear any scheduling exceptions for a specific Reclaim.ai task." })
   );
 
@@ -197,7 +217,7 @@ export function registerTaskActionTools(server: McpServer): void {
     {
       taskId: taskIdSchema.describe("The unique ID of the task to prioritize."),
     },
-    async ({ taskId }) => wrapApiCall(api.prioritizeTask(taskId)),
+    async ({ taskId }) => wrapApiCall(apiClient.prioritizeTask(taskId)),
     // .annotations({ description: "Mark a specific Reclaim.ai task for prioritization in the schedule." })
   );
 }

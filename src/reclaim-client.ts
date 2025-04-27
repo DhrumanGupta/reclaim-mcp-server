@@ -223,6 +223,10 @@ const handleApiError = (error: unknown, context: string): never => {
   let status: number | undefined;
   let detail: unknown;
   let message: string;
+  let rawResponse: unknown = null;
+
+  // Log the raw error to help with debugging
+  logger.debug(`Raw error in ${context}:`, error);
 
   if (axios.isAxiosError(error)) {
     // Handle errors from Axios (common with API calls)
@@ -235,10 +239,29 @@ const handleApiError = (error: unknown, context: string): never => {
     status = axiosStatus;
     message = axiosMessage;
     detail = axiosDetail;
+
+    // Extract the raw response data for detailed debugging
+    // This helps us see exactly what the API returned
+    rawResponse = {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      headers: error.response?.headers,
+      data: error.response?.data,
+      config: {
+        url: error.config?.url,
+        method: error.config?.method,
+        data: error.config?.data,
+        params: error.config?.params,
+      },
+    };
+
+    // Log detailed API response information
+    logger.error(`API Error in ${context}: ${message}`, { status, detail, rawResponse });
   } else if (error instanceof Error) {
     const { message: errorMessage, detail: errorDetail } = extractErrorInfo(error);
     message = errorMessage;
     detail = errorDetail;
+    logger.error(`Error in ${context}: ${message}`, { name: error.name, stack: error.stack });
   } else {
     // Handle cases where something other than an Error was thrown
     message = "An unexpected error occurred during API call.";
@@ -248,7 +271,7 @@ const handleApiError = (error: unknown, context: string): never => {
 
   // Throw a structured error for consistent handling upstream.
   // Include both context and message for better debugging.
-  throw new ReclaimError(`${context}: ${message}`, status, detail);
+  throw new ReclaimError(`${context}: ${message}`, status, detail, rawResponse);
 };
 
 /**

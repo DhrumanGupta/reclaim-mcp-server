@@ -13,11 +13,11 @@ export const testConfig = {
   // Prefix for test task titles to identify test-created tasks
   taskPrefix: "[TEST]",
 
-  // Delay between API calls to avoid rate limiting
-  apiCallDelay: 500,
+  // Delay between API calls to avoid rate limiting (increased to reduce rate limiting issues)
+  apiCallDelay: 1500,
 
   // Default timeout for tests calling the API
-  apiTimeout: 10000,
+  apiTimeout: 15000,
 };
 
 /**
@@ -61,13 +61,25 @@ export async function callWithLogging<T>(
     await delay(testConfig.apiCallDelay);
     return result;
   } catch (error) {
+    // More detailed error logging
+    const errorDetails = {
+      message: error instanceof Error ? error.message : String(error),
+      name: error instanceof Error ? error.name : "Unknown",
+      stack: error instanceof Error ? error.stack : undefined,
+      // Extra properties that might be useful for debugging API errors
+      ...(error instanceof Error && "status" in error ? { status: (error as any).status } : {}),
+      ...(error instanceof Error && "detail" in error ? { detail: (error as any).detail } : {}),
+      raw: error, // Include the raw error object for complete details
+    };
+
+    testLogger.error(`${testName} - ${functionName} ERROR: ${errorDetails.message}`);
     testLogger.apiCall(
       testName,
       functionName,
       typeof args[0] === "number" ? `/${args[0]}` : "",
       args,
       undefined,
-      error,
+      errorDetails,
     );
     throw error;
   }

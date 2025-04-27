@@ -77,18 +77,53 @@ export interface TaskInputData {
 export class ReclaimError extends Error {
   status?: number;
   detail?: unknown;
+  rawResponse?: unknown;
 
-  constructor(message: string, status?: number, detail?: unknown) {
+  constructor(message: string, status?: number, detail?: unknown, rawResponse?: unknown) {
     super(message);
     this.name = "ReclaimError";
     if (status !== undefined) {
       this.status = status;
     }
     this.detail = detail;
+    this.rawResponse = rawResponse;
 
     // Maintains proper stack trace in V8 environments (Node.js)
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, ReclaimError);
     }
   }
+}
+
+/**
+ * Interface for all Reclaim API client methods
+ * This allows for dependency injection and mocking in tests
+ */
+export interface ReclaimApiClient {
+  // Task retrieval methods
+  listTasks(): Promise<Task[]>;
+  getTask(taskId: number): Promise<Task>;
+  filterActiveTasks(tasks: Task[]): Task[];
+
+  // Task CRUD operations
+  createTask(taskData: TaskInputData): Promise<Task>;
+  updateTask(taskId: number, taskData: TaskInputData): Promise<Task>;
+  deleteTask(taskId: number): Promise<void>;
+
+  // Task status operations
+  markTaskComplete(taskId: number): Promise<unknown>;
+  markTaskIncomplete(taskId: number): Promise<unknown>;
+
+  // Task time management
+  addTimeToTask(taskId: number, minutes: number): Promise<unknown>;
+  logWorkForTask(taskId: number, minutes: number, end?: string): Promise<unknown>;
+
+  // Task scheduling operations
+  startTaskTimer(taskId: number): Promise<unknown>;
+  stopTaskTimer(taskId: number): Promise<unknown>;
+  prioritizeTask(taskId: number): Promise<unknown>;
+  clearTaskExceptions(taskId: number): Promise<unknown>;
+
+  // Helper methods
+  parseDeadline(deadlineInput: number | string | undefined): string;
 }

@@ -4,12 +4,18 @@
  */
 
 import { logger } from "../logger.js"; // Import the logger utility
-import * as api from "../reclaim-client.js";
+import * as defaultApi from "../reclaim-client.js";
 import { ReclaimError } from "../types/reclaim.js"; // Ensure .js extension if needed by module system
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 // Import specific result and content types from the SDK
 import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
+
+// Define type for the API client to support dependency injection
+type ReclaimApiClient = {
+  listTasks: typeof defaultApi.listTasks;
+  filterActiveTasks: typeof defaultApi.filterActiveTasks;
+};
 
 /**
  * Wraps an API call promise specifically for MCP Resource handlers.
@@ -77,8 +83,12 @@ async function wrapResourceCall(
  * Currently registers the 'tasks://active' resource.
  *
  * @param server - The McpServer instance to register resources against.
+ * @param apiClient - Optional API client for dependency injection (used in testing)
  */
-export function registerTaskResources(server: McpServer): void {
+export function registerTaskResources(
+  server: McpServer,
+  apiClient: ReclaimApiClient = defaultApi,
+): void {
   // Register a static resource for active tasks.
   // The signature requires (name, uriTemplate, [metadata], handler)
   server.resource(
@@ -95,9 +105,9 @@ export function registerTaskResources(server: McpServer): void {
     // For static URIs, params will be empty.
     async (uri) => {
       // Fetch all tasks, then filter for active ones using the client's filter function
-      const activeTasksPromise = api
+      const activeTasksPromise = apiClient
         .listTasks()
-        .then((allTasks) => api.filterActiveTasks(allTasks));
+        .then((allTasks) => apiClient.filterActiveTasks(allTasks));
 
       // Use the wrapper to format the result correctly for the SDK
       // Pass uri.href which is the string representation of the URL

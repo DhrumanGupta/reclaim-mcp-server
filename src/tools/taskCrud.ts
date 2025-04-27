@@ -4,19 +4,29 @@
 
 import { z } from "zod";
 
-import * as api from "../reclaim-client.js";
+import * as defaultApi from "../reclaim-client.js";
 import { wrapApiCall } from "../utils.js";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TaskInputData } from "../types/reclaim.js";
+
+// Define type for the API client to support dependency injection
+type ReclaimApiClient = {
+  createTask: typeof defaultApi.createTask;
+  updateTask: typeof defaultApi.updateTask;
+};
 
 /**
  * Registers task creation and update tools with the provided MCP Server instance.
  * Uses the (name, schema, handler) signature for server.tool.
  *
  * @param server - The McpServer instance to register tools against.
+ * @param apiClient - Optional API client for dependency injection (used in testing)
  */
-export function registerTaskCrudTools(server: McpServer): void {
+export function registerTaskCrudTools(
+  server: McpServer,
+  apiClient: ReclaimApiClient = defaultApi,
+): void {
   // --- Zod Schema for Task Properties (used in both create and update) ---
   const taskPropertiesSchema = {
     title: z.string().min(1, "Title cannot be empty."),
@@ -83,7 +93,7 @@ export function registerTaskCrudTools(server: McpServer): void {
     async (params) => {
       // The 'params' object directly matches the schema structure
       // Cast to TaskInputData for the API client (which handles 'deadline'/'due' conversion)
-      return wrapApiCall(api.createTask(params as TaskInputData));
+      return wrapApiCall(apiClient.createTask(params as TaskInputData));
     },
     // Consider adding annotations like description, idempotentHint=false
     // .annotations({ description: "Create a new task in Reclaim.ai", idempotentHint: false });
@@ -119,7 +129,7 @@ export function registerTaskCrudTools(server: McpServer): void {
       }
 
       // Cast updateData to TaskInputData for the API client
-      return wrapApiCall(api.updateTask(taskId, updateData as TaskInputData));
+      return wrapApiCall(apiClient.updateTask(taskId, updateData as TaskInputData));
     },
     // Consider adding annotations like description, idempotentHint=true (usually)
     // .annotations({ description: "Update specific fields of an existing Reclaim.ai task.", idempotentHint: true });

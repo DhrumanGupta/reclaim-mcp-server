@@ -48,6 +48,65 @@ const serverInfo = {
   description: pkg.description || "MCP Server for Reclaim.ai Tasks",
 };
 
+// Configuration for server initialization
+// Import the ReclaimApiClient interface for dependency injection
+import type { ReclaimApiClient } from "./types/reclaim.js";
+
+export interface ServerConfig {
+  isTestMode?: boolean;
+  apiKey?: string;
+  apiClient?: ReclaimApiClient; // Allow injecting API client for tests
+}
+
+/**
+ * Initializes the Reclaim MCP Server with the provided configuration.
+ * - Sets up server info.
+ * - Registers all defined tools and resources.
+ * - Returns the server instance but does not connect it to a transport.
+ *
+ * @param config - Optional configuration for server initialization
+ * @returns The initialized server instance
+ */
+export function initializeServer(config: ServerConfig = {}): McpServer {
+  const { isTestMode = false, apiKey = process.env.RECLAIM_API_KEY, apiClient } = config;
+
+  // Crucial check: Ensure the API token is loaded, unless in test mode
+  if (!apiKey && !isTestMode) {
+    logger.error("FATAL ERROR: RECLAIM_API_KEY environment variable is not set.");
+    logger.error(
+      "Please ensure a .env file exists in the project root and contains your Reclaim.ai API token.",
+    );
+    logger.error("Example: RECLAIM_API_KEY=your_api_token_here");
+    process.exit(1); // Exit immediately if token is missing.
+  } else if (apiKey) {
+    // Avoid logging the token itself!
+    logger.error("Reclaim API Token found in environment variables.");
+  } else {
+    logger.error("Running in test mode with no API key.");
+  }
+
+  // Create the MCP Server instance with server information.
+  const server = new McpServer(serverInfo);
+  logger.error(`Server instance created for "${serverInfo.name}".`);
+
+  // Register all features (Tools and Resources).
+  logger.error("Registering MCP features...");
+  try {
+    registerTaskActionTools(server, apiClient);
+    registerTaskCrudTools(server, apiClient);
+    registerTaskResources(server, apiClient);
+    logger.error("All tools and resources registered successfully.");
+  } catch (registrationError) {
+    logger.error("ERROR during feature registration:", registrationError);
+    if (!isTestMode) {
+      process.exit(1);
+    }
+    throw registrationError;
+  }
+
+  return server;
+}
+
 /**
  * Initializes and starts the Reclaim MCP Server.
  * - Sets up server info.
@@ -59,34 +118,8 @@ async function main(): Promise<void> {
   // Use logger.error for ALL operational logs to keep stdout clean for JSON-RPC
   logger.error(`Initializing ${serverInfo.name} v${serverInfo.version}...`);
 
-  // Crucial check: Ensure the API token is loaded.
-  if (!process.env.RECLAIM_API_KEY) {
-    logger.error("FATAL ERROR: RECLAIM_API_KEY environment variable is not set.");
-    logger.error(
-      "Please ensure a .env file exists in the project root and contains your Reclaim.ai API token.",
-    );
-    logger.error("Example: RECLAIM_API_KEY=your_api_token_here");
-    process.exit(1); // Exit immediately if token is missing.
-  } else {
-    // Avoid logging the token itself!
-    logger.error("Reclaim API Token found in environment variables.");
-  }
-
-  // Create the MCP Server instance with server information.
-  const server = new McpServer(serverInfo);
-  logger.error(`Server instance created for "${serverInfo.name}".`);
-
-  // Register all features (Tools and Resources).
-  logger.error("Registering MCP features...");
-  try {
-    registerTaskActionTools(server);
-    registerTaskCrudTools(server);
-    registerTaskResources(server);
-    logger.error("All tools and resources registered successfully.");
-  } catch (registrationError) {
-    logger.error("FATAL ERROR during feature registration:", registrationError);
-    process.exit(1);
-  }
+  // Initialize the server
+  const server = initializeServer();
 
   // Create and connect the transport (Stdio by default).
   // Stdio transport reads JSON-RPC from stdin and writes to stdout.
@@ -118,8 +151,11 @@ process.on("uncaughtException", (error) => {
   logger.error("Uncaught Exception:", error);
 });
 
-// Execute the main function and handle top-level errors.
-main().catch((error) => {
-  logger.error("FATAL ERROR during server startup sequence:", error);
-  process.exit(1); // Exit if main function fails critically.
-});
+// Don't execute the main function if this file is imported as a module (e.g., in tests)
+if (import.meta.url === `file://${process.argv[1]}`) {
+  // Execute the main function and handle top-level errors.
+  main().catch((error) => {
+    logger.error("FATAL ERROR during server startup sequence:", error);
+    process.exit(1); // Exit if main function fails critically.
+  });
+}
