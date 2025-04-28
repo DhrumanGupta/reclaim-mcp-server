@@ -41,15 +41,17 @@ export function registerTaskActionTools(
   // --- Common Schemas ---
   const taskIdSchema = z.number().int().positive("Task ID must be a positive integer.");
   const statusNote =
-    "IMPORTANT NOTE: Tasks with 'status: COMPLETE' were NOT marked complete by the user. This means the user finished the initial block of time allocated to the task but did NOT finish the task. If asked to list all tasks or all active tasks, include each 'COMPLETE' task unless the user requests otherwise. Do NOT skip 'COMPLETE' tasks.";
-  const getTaskStatusNote =
-    "Note: If 'status' is 'COMPLETE', this means the task is NOT marked completed by the user. ARCHIVED or CANCELLED is used for completed tasks. A 'COMPLETE' task is still 'active'.";
+    "IMPORTANT NOTE ON 'COMPLETE' STATUS: In Reclaim.ai, tasks marked 'COMPLETE' mean their *scheduled time block* finished, but the user did NOT necessarily finish the work or mark it done. Treat 'COMPLETE' tasks as ACTIVE and PENDING unless they are also ARCHIVED or CANCELLED. If asked for 'active' or 'open' tasks, YOU MUST INCLUDE tasks with status 'COMPLETE'.";
+  const getTimeStatusNote =
+    "Note on 'status': If 'COMPLETE', the scheduled time block ended, but the user has NOT marked the task done. It is still considered active/pending.";
 
   // --- Tool Definitions ---
 
   // List tasks tool (Ported from return_tasks flag in prior JS implementation)
   server.tool(
     "reclaim_list_tasks",
+    // Description string as 2nd parameter
+    `Lists Reclaim.ai tasks. Default filter is "active". ${statusNote}`,
     // Zod schema for parameters
     {
       filter: z
@@ -83,12 +85,13 @@ export function registerTaskActionTools(
       }
       return result;
     },
-    // .annotations({ description: "Lists Reclaim.ai tasks, optionally filtering for active ones (not deleted, ARCHIVED, or CANCELLED)." })
   );
 
   // Get specific task tool
   server.tool(
     "reclaim_get_task",
+    // Description string as 2nd parameter
+    `Retrieves details for a specific Reclaim.ai task by its ID. ${getTimeStatusNote}`,
     // Zod schema for parameters
     { taskId: taskIdSchema.describe("The unique ID of the task to fetch.") },
     // Async handler function using wrapApiCall
@@ -98,46 +101,45 @@ export function registerTaskActionTools(
       if (!result.isError && result.content) {
         result.content.push({
           type: "text",
-          text: getTaskStatusNote,
+          text: getTimeStatusNote,
         });
       }
       return result;
     },
-    // .annotations({ description: "Fetch details for a specific Reclaim.ai task by its ID." })
   );
 
   // Mark task complete tool
   server.tool(
     "reclaim_mark_complete",
+    "Marks a specific Reclaim.ai task as completed/done by the user. This usually archives the task.",
     {
       taskId: taskIdSchema.describe("The unique ID of the task to mark as complete."),
     },
     async ({ taskId }) => wrapApiCall(apiClient.markTaskComplete(taskId)),
-    // .annotations({ description: "Mark a specific Reclaim.ai task as completed/done by the user." })
   );
 
   // Mark task incomplete tool
   server.tool(
     "reclaim_mark_incomplete",
+    "Marks a specific Reclaim.ai task as incomplete (e.g., unarchives it, moves it back to the planner).",
     {
       taskId: taskIdSchema.describe("The unique ID of the task to mark as incomplete (unarchive)."),
     },
     async ({ taskId }) => wrapApiCall(apiClient.markTaskIncomplete(taskId)),
-    // .annotations({ description: "Mark a specific Reclaim.ai task as incomplete (e.g., unarchive it)." })
   );
 
   // Delete task tool
   server.tool(
     "reclaim_delete_task",
+    "Permanently delete a specific Reclaim.ai task. This action cannot be undone easily.",
     { taskId: taskIdSchema.describe("The unique ID of the task to delete.") },
     async ({ taskId }) => wrapApiCall(apiClient.deleteTask(taskId)),
-    // Consider adding destructiveHint=true via annotations if needed by clients
-    // .annotations({ description: "Permanently delete a specific Reclaim.ai task.", destructiveHint: true });
   );
 
   // Add time to task tool
   server.tool(
     "reclaim_add_time",
+    "Adds scheduled time (in minutes) to a specific Reclaim.ai task. This blocks more time on the user's calendar. Use this if a task needs more time than allocated (e.g., timeChunksRemaining is 0 but work remains) or if a task has status 'COMPLETE' but the user indicates it's not finished.",
     {
       taskId: taskIdSchema.describe("The unique ID of the task to add time to."),
       minutes: z
@@ -147,32 +149,32 @@ export function registerTaskActionTools(
         .describe("Number of minutes to add to the task schedule."),
     },
     async ({ taskId, minutes }) => wrapApiCall(apiClient.addTimeToTask(taskId, minutes)),
-    // .annotations({ description: "Add scheduled time (in minutes) to a specific Reclaim.ai task." })
   );
 
   // Start task timer tool
   server.tool(
     "reclaim_start_timer",
+    "Starts the live timer for a specific Reclaim.ai task. This indicates the user is actively working on it now and helps log time accurately.",
     {
       taskId: taskIdSchema.describe("The unique ID of the task to start the timer for."),
     },
     async ({ taskId }) => wrapApiCall(apiClient.startTaskTimer(taskId)),
-    // .annotations({ description: "Start the live timer for a specific Reclaim.ai task." })
   );
 
   // Stop task timer tool
   server.tool(
     "reclaim_stop_timer",
+    "Stops the live timer for a specific Reclaim.ai task. Time tracked is automatically logged.",
     {
       taskId: taskIdSchema.describe("The unique ID of the task to stop the timer for."),
     },
     async ({ taskId }) => wrapApiCall(apiClient.stopTaskTimer(taskId)),
-    // .annotations({ description: "Stop the live timer for a specific Reclaim.ai task." })
   );
 
   // Log work for task tool
   server.tool(
     "reclaim_log_work",
+    "Logs completed work time (in minutes) against a specific Reclaim.ai task. This reduces the remaining time needed and affects future scheduling.",
     {
       taskId: taskIdSchema.describe("The unique ID of the task to log work against."),
       minutes: z
@@ -196,28 +198,27 @@ export function registerTaskActionTools(
         ),
     },
     async ({ taskId, minutes, end }) => wrapApiCall(apiClient.logWorkForTask(taskId, minutes, end)),
-    // .annotations({ description: "Log completed work time (in minutes) against a specific Reclaim.ai task." })
   );
 
   // Clear task exceptions tool
   server.tool(
     "reclaim_clear_exceptions",
+    "Clears any scheduling exceptions (e.g., manual adjustments, declines) for a specific Reclaim.ai task, allowing it to reschedule normally.",
     {
       taskId: taskIdSchema.describe(
         "The unique ID of the task whose scheduling exceptions should be cleared.",
       ),
     },
     async ({ taskId }) => wrapApiCall(apiClient.clearTaskExceptions(taskId)),
-    // .annotations({ description: "Clear any scheduling exceptions for a specific Reclaim.ai task." })
   );
 
   // Prioritize task tool
   server.tool(
     "reclaim_prioritize",
+    "Marks a specific Reclaim.ai task for prioritization ('On Deck'), increasing its likelihood of being scheduled sooner.",
     {
       taskId: taskIdSchema.describe("The unique ID of the task to prioritize."),
     },
     async ({ taskId }) => wrapApiCall(apiClient.prioritizeTask(taskId)),
-    // .annotations({ description: "Mark a specific Reclaim.ai task for prioritization in the schedule." })
   );
 }

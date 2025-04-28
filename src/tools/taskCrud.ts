@@ -88,6 +88,7 @@ export function registerTaskCrudTools(
   // --- CREATE Task Tool ---
   server.tool(
     "reclaim_create_task",
+    "Create a new task in Reclaim.ai. Requires at least a 'title'. Other fields like 'timeChunksRequired', 'priority', 'deadline', 'notes', 'eventCategory' are optional but recommended.",
     // Schema for create: title is required, other properties are optional
     taskPropertiesSchema, // Directly use the defined schema object
     async (params) => {
@@ -95,13 +96,12 @@ export function registerTaskCrudTools(
       // Cast to TaskInputData for the API client (which handles 'deadline'/'due' conversion)
       return wrapApiCall(apiClient.createTask(params as TaskInputData));
     },
-    // Consider adding annotations like description, idempotentHint=false
-    // .annotations({ description: "Create a new task in Reclaim.ai", idempotentHint: false });
   );
 
   // --- UPDATE Task Tool ---
   server.tool(
     "reclaim_update_task",
+    "Update specific fields of an existing Reclaim.ai task using its ID. This performs a PATCH operation – only provided fields are changed.\nIMPORTANT: Updating fields like 'notes' overwrites the existing content. To *append* to notes, you MUST first use 'reclaim_get_task' to fetch the current notes, then provide the full combined text (old + new) in the 'notes' field of this update call.",
     // Schema for update: requires taskId, all other properties are optional
     {
       taskId: z.number().int().positive("Task ID must be a positive integer."),
@@ -129,9 +129,10 @@ export function registerTaskCrudTools(
       }
 
       // Cast updateData to TaskInputData for the API client
+      // Note: The API client internally handles 'deadline'/'due' and 'snoozeUntil' parsing.
+      // The warning about preserving notes needs to be handled by the *calling* LLM workflow,
+      // as this tool simply performs the PATCH operation provided.
       return wrapApiCall(apiClient.updateTask(taskId, updateData as TaskInputData));
     },
-    // Consider adding annotations like description, idempotentHint=true (usually)
-    // .annotations({ description: "Update specific fields of an existing Reclaim.ai task.", idempotentHint: true });
   );
 }

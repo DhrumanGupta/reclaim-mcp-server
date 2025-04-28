@@ -95,11 +95,13 @@ export function registerTaskResources(
     "reclaim_active_tasks", // Internal name for the resource registration
     "tasks://active", // The static URI string for this resource
     {
-      // Optional metadata object
+      // Optional metadata object with enhanced information
       title: "Active Reclaim Tasks",
       description:
-        "List of all active tasks from Reclaim.ai. Active means tasks that are not deleted and whose status is not ARCHIVED or CANCELLED. Tasks with status 'COMPLETE' (meaning scheduled time is finished) are included here.",
+        "Provides a list of all active tasks from Reclaim.ai as a JSON array. Active means tasks that are not deleted and whose status is not ARCHIVED or CANCELLED.\n" +
+        "IMPORTANT NOTE ON 'COMPLETE' STATUS: Tasks with status 'COMPLETE' (meaning scheduled time is finished) ARE INCLUDED here because the user has NOT marked them as done. These should be treated as active, potentially past-due tasks, not finished items.",
       readOnlyHint: true,
+      mimeType: "application/json", // Add mimeType here as well
     },
     // Handler function: (uri: URL, params: Record<string, string | string[]>, extra) => Promise<ReadResourceResult>
     // For static URIs, params will be empty.
