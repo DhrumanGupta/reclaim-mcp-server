@@ -17,6 +17,7 @@ interface ToolDefinition {
   description?: string;
   inputSchema: JSONSchema7;
   annotations?: {
+    title?: string;
     readOnlyHint?: boolean;
     idempotentHint?: boolean;
     destructiveHint?: boolean;
@@ -31,6 +32,8 @@ export const toolDefinitions: ToolDefinition[] = [
       "Lists Reclaim.ai tasks. Default filter is 'active'. IMPORTANT NOTE ON 'COMPLETE' STATUS: In Reclaim.ai, tasks marked 'COMPLETE' mean their *scheduled time block* finished, but the user did NOT necessarily finish the work or mark it done. Treat 'COMPLETE' tasks as ACTIVE and PENDING unless they are also ARCHIVED or CANCELLED. If asked for 'active' or 'open' tasks, YOU MUST INCLUDE tasks with status 'COMPLETE'.",
     inputSchema: {
       type: "object",
+      description:
+        "Lists Reclaim.ai tasks. Default filter is 'active'. IMPORTANT NOTE ON 'COMPLETE' STATUS: In Reclaim.ai, tasks marked 'COMPLETE' mean their *scheduled time block* finished, but the user did NOT necessarily finish the work or mark it done. Treat 'COMPLETE' tasks as ACTIVE and PENDING unless they are also ARCHIVED or CANCELLED. If asked for 'active' or 'open' tasks, YOU MUST INCLUDE tasks with status 'COMPLETE'.",
       properties: {
         filter: {
           type: "string",

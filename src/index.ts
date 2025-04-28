@@ -9,15 +9,15 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import {
   CallToolRequestSchema,
   type CallToolResult,
-  type TextContent, // Import TextContent type instead of ContentPart/TextContentPart
   ListToolsRequestSchema,
+  type TextContent, // Import TextContent type instead of ContentPart/TextContentPart
 } from "@modelcontextprotocol/sdk/types.js"; // Import necessary schemas and types
 import "dotenv/config"; // Load environment variables from .env file
 import { createRequire } from "node:module";
 
 import { logger } from "./logger.js";
 import * as defaultApi from "./reclaim-client.js"; // Import the actual API client implementation
-import { toolDefinitions } from "./tools/definitions.js"; // Import the static tool definitions from .ts file
+import { toolDefinitions } from "./tools/definitions.js"; // Import the static tool definitions
 
 // Import handler functions from taskActions and taskCrud
 import * as taskActions from "./tools/taskActions.js";
@@ -78,26 +78,25 @@ function logSdkVersion(): void {
 type ToolHandler = (params: unknown, apiClient: ReclaimApiClient) => Promise<CallToolResult>; // Use CallToolResult from SDK types
 
 /**
- * Map tool names to their handler functions.
+ * Map tool names to their handler functions using Map to avoid naming convention lint.
  * This acts as the router for the CallToolRequestSchema handler.
  */
-const toolHandlers: Record<string, ToolHandler> = {
-  // Task Actions
-  reclaim_list_tasks: taskActions.handleListTasks,
-  reclaim_get_task: taskActions.handleGetTask,
-  reclaim_mark_complete: taskActions.handleMarkComplete,
-  reclaim_mark_incomplete: taskActions.handleMarkIncomplete,
-  reclaim_delete_task: taskActions.handleDeleteTask,
-  reclaim_add_time: taskActions.handleAddTime,
-  reclaim_start_timer: taskActions.handleStartTimer,
-  reclaim_stop_timer: taskActions.handleStopTimer,
-  reclaim_log_work: taskActions.handleLogWork,
-  reclaim_clear_exceptions: taskActions.handleClearExceptions,
-  reclaim_prioritize: taskActions.handlePrioritize,
+const toolHandlers = new Map<string, ToolHandler>([
+  ["reclaim_list_tasks", taskActions.handleListTasks],
+  ["reclaim_get_task", taskActions.handleGetTask],
+  ["reclaim_mark_complete", taskActions.handleMarkComplete],
+  ["reclaim_mark_incomplete", taskActions.handleMarkIncomplete],
+  ["reclaim_delete_task", taskActions.handleDeleteTask],
+  ["reclaim_add_time", taskActions.handleAddTime],
+  ["reclaim_start_timer", taskActions.handleStartTimer],
+  ["reclaim_stop_timer", taskActions.handleStopTimer],
+  ["reclaim_log_work", taskActions.handleLogWork],
+  ["reclaim_clear_exceptions", taskActions.handleClearExceptions],
+  ["reclaim_prioritize", taskActions.handlePrioritize],
   // Task CRUD
-  reclaim_create_task: taskCrud.handleCreateTask,
-  reclaim_update_task: taskCrud.handleUpdateTask, // This assignment should now be valid
-};
+  ["reclaim_create_task", taskCrud.handleCreateTask],
+  ["reclaim_update_task", taskCrud.handleUpdateTask], // This assignment should now be valid
+]);
 
 /**
  * Initializes the Reclaim MCP Server with the provided configuration.
@@ -151,7 +150,7 @@ export function initializeServer(config: ServerConfig = {}): Server {
     logger.debug(`CallTool request received for tool: ${toolName}`);
     logger.debug(`Arguments: ${JSON.stringify(args)}`);
 
-    const handler = toolHandlers[toolName];
+    const handler = toolHandlers.get(toolName);
 
     if (handler) {
       try {
