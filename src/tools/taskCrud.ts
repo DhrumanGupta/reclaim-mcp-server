@@ -3,19 +3,16 @@
  */
 
 import { z } from "zod";
+import type { ZodRawShape, ZodTypeAny } from "zod"; // Import ZodRawShape type
 
 import * as defaultApi from "../reclaim-client.js";
 import { wrapApiCall } from "../utils.js";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { ZodRawShape, ZodTypeAny } from "zod"; // Import ZodRawShape type
-import type { TaskInputData } from "../types/reclaim.js";
+import type { ReclaimApiClient, TaskInputData } from "../types/reclaim.js";
 
-// Define type for the API client to support dependency injection
-type ReclaimApiClient = {
-  createTask: typeof defaultApi.createTask;
-  updateTask: typeof defaultApi.updateTask;
-};
+// Define type for the API client methods needed here
+type CrudApiClient = Pick<ReclaimApiClient, "createTask" | "updateTask">;
 
 // Define complex types separately for reuse in raw shapes
 const deadlineSchemaType = z
@@ -57,13 +54,14 @@ const eventColorSchemaType = z
 /**
  * Registers task creation and update tools with the provided MCP Server instance.
  * Uses the (name, description, rawShape, handler) signature based on TS errors and analysis.
+ * Handler parameter types are inferred using z.infer.
  *
- * @param server - The McpServer instance to register tools against.
- * @param apiClient - Optional API client for dependency injection (used in testing)
+ * @param server - The McpServer instance to register handlers against.
+ * @param apiClient - Optional API client for dependency injection (used in testing).
  */
 export function registerTaskCrudTools(
   server: McpServer,
-  apiClient: ReclaimApiClient = defaultApi,
+  apiClient: CrudApiClient = defaultApi, // Use the specific client type
 ): void {
   // --- Define Raw Shapes for Zod Schemas ---
   const taskPropertiesShape: ZodRawShape = {
@@ -85,14 +83,17 @@ export function registerTaskCrudTools(
     snoozeUntil: snoozeUntilSchemaType,
     eventColor: eventColorSchemaType,
   };
+  // Infer type for handler params from the shape
+  type CreateTaskParams = z.infer<z.ZodObject<typeof taskPropertiesShape>>;
 
   // --- CREATE Task Tool ---
   server.tool(
     "reclaim_create_task",
     "Create a new task in Reclaim.ai. Requires at least a 'title'. Other fields like 'timeChunksRequired', 'priority', 'deadline', 'notes', 'eventCategory' are optional but recommended.", // Description (2nd arg)
     taskPropertiesShape, // RAW SHAPE object (3rd arg)
-    async (params) => {
-      // Params type should be inferred from taskPropertiesShape
+    // Use inferred type for params
+    async (params: CreateTaskParams) => {
+      // Now params is strongly typed
       return wrapApiCall(apiClient.createTask(params as TaskInputData));
     },
   );
@@ -114,17 +115,20 @@ export function registerTaskCrudTools(
     status: z
       .enum(["NEW", "SCHEDULED", "IN_PROGRESS", "COMPLETE", "CANCELLED", "ARCHIVED"])
       .optional(),
-    deadline: deadlineSchemaType, // Use defined type
-    snoozeUntil: snoozeUntilSchemaType, // Use defined type
-    eventColor: eventColorSchemaType, // Use defined type
+    deadline: deadlineSchemaType,
+    snoozeUntil: snoozeUntilSchemaType,
+    eventColor: eventColorSchemaType,
   };
+  // Infer type for handler params from the shape
+  type UpdateTaskParams = z.infer<z.ZodObject<typeof updateTaskShape>>;
 
   server.tool(
     "reclaim_update_task",
     "Update specific fields of an existing Reclaim.ai task using its ID. This performs a PATCH operation – only provided fields are changed.\nIMPORTANT: Updating fields like 'notes' overwrites the existing content. To *append* to notes, you MUST first use 'reclaim_get_task' to fetch the current notes, then provide the full combined text (old + new) in the 'notes' field of this update call.", // Description (2nd arg)
     updateTaskShape, // RAW SHAPE object (3rd arg)
-    async (params) => {
-      // Params type should be inferred from updateTaskShape
+    // Use inferred type for params
+    async (params: UpdateTaskParams) => {
+      // Now params is strongly typed
       const { taskId, ...updateData } = params;
 
       if (Object.keys(updateData).length === 0) {
