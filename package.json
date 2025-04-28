@@ -55,6 +55,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
+    "@types/json-schema": "^7.0.15",
     "@types/nock": "^11.1.0",
     "@types/node": "^22.15.2",
     "@vitest/coverage-c8": "^0.33.0",

@@ -24,6 +24,9 @@ importers:
       '@biomejs/biome':
         specifier: 1.9.4
         version: 1.9.4
+      '@types/json-schema':
+        specifier: ^7.0.15
+        version: 7.0.15
       '@types/nock':
         specifier: ^11.1.0
         version: 11.1.0
@@ -433,6 +436,9 @@ packages:
 
   '@types/istanbul-lib-coverage@2.0.6':
     resolution: {integrity: sha512-2QF/t/auWm0lsy8XtKVPG19v3sSOQlJe/YHZgfjb/KBBHOGSV+J2q/S671rcq9uTBrLAXmZpqJiaQbMT+zNU1w==}
+
+  '@types/json-schema@7.0.15':
+    resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
 
   '@types/nock@11.1.0':
     resolution: {integrity: sha512-jI/ewavBQ7X5178262JQR0ewicPAcJhXS/iFaNJl0VHLfyosZ/kwSrsa6VNQNSO8i9d8SqdRgOtZSOKJ/+iNMw==}
@@ -1630,6 +1636,8 @@ snapshots:
   '@types/estree@1.0.7': {}
 
   '@types/istanbul-lib-coverage@2.0.6': {}
+
+  '@types/json-schema@7.0.15': {}
 
   '@types/nock@11.1.0':
     dependencies:

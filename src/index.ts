@@ -1,21 +1,31 @@
 /**
  * @fileoverview Main entry point for the Reclaim.ai MCP Server.
- * Initializes the server, registers tools and resources, and connects the transport.
+ * Initializes the server, registers tools and resources via explicit handlers,
+ * and connects the transport.
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import {
+  CallToolRequestSchema,
+  type CallToolResult,
+  type TextContent, // Import TextContent type instead of ContentPart/TextContentPart
+  ListToolsRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js"; // Import necessary schemas and types
 import "dotenv/config"; // Load environment variables from .env file
-
-import { logger } from "./logger.js";
-import { registerTaskResources } from "./resources/tasks.js";
-import { registerTaskActionTools } from "./tools/taskActions.js";
-import { registerTaskCrudTools } from "./tools/taskCrud.js";
-
-// --- Server Information ---
 import { createRequire } from "node:module";
 
+import { logger } from "./logger.js";
+import * as defaultApi from "./reclaim-client.js"; // Import the actual API client implementation
+import { toolDefinitions } from "./tools/definitions.js"; // Import the static tool definitions from .ts file
+
+// Import handler functions from taskActions and taskCrud
+import * as taskActions from "./tools/taskActions.js";
+import * as taskCrud from "./tools/taskCrud.js";
+
+import type { ReclaimApiClient } from "./types/reclaim.js"; // Import API client type
+
+// --- Server Information ---
 const require = createRequire(import.meta.url);
 type PackageJson = {
   name?: string;
@@ -42,10 +52,7 @@ const serverInfo = {
   description: pkg.description || "MCP Server for Reclaim.ai Tasks",
 };
 
-import * as defaultApi from "./reclaim-client.js"; // Import the actual API client implementation
 // --- Server Configuration & Initialization ---
-import type { ReclaimApiClient } from "./types/reclaim.js";
-
 export interface ServerConfig {
   isTestMode?: boolean;
   apiKey?: string;
@@ -66,58 +73,36 @@ function logSdkVersion(): void {
 }
 
 /**
- * Registers all MCP tools with the provided server.
- *
- * @param server - The server instance to register tools with
- * @param apiClient - The API client to use for tool handlers
- * @param isTestMode - Whether the server is running in test mode
+ * Type definition for handler functions using the SDK's CallToolResult
  */
-function registerServerTools(
-  server: Server,
-  apiClient: ReclaimApiClient,
-  isTestMode: boolean,
-): void {
-  try {
-    // Register task-related tools
-    logger.error("Registering MCP tools and handlers...");
-    registerTaskActionTools(server as unknown as McpServer, apiClient);
-    registerTaskCrudTools(server as unknown as McpServer, apiClient);
+type ToolHandler = (params: unknown, apiClient: ReclaimApiClient) => Promise<CallToolResult>; // Use CallToolResult from SDK types
 
-    // Debug logging to see what tools were registered
-    // @ts-ignore - Access private property for debugging
-    const toolsMap = server._tools;
-    if (toolsMap) {
-      logger.error(`Registered tools: ${Array.from(toolsMap.keys()).join(", ")}`);
-      // Log the example tool definition to see the format
-      const exampleTool = toolsMap.get("calculate_sum");
-      if (exampleTool) {
-        logger.error(`Example tool definition: ${JSON.stringify(exampleTool, null, 2)}`);
-      }
-
-      // Log a sample tool definition to see the format
-      const sampleTool = toolsMap.get(Array.from(toolsMap.keys())[0]);
-      if (sampleTool) {
-        logger.error(`Sample tool definition: ${JSON.stringify(sampleTool, null, 2)}`);
-      }
-    } else {
-      logger.error("Could not access tools map for debugging");
-    }
-
-    logger.error("Tools and handlers registered successfully.");
-  } catch (registrationError) {
-    logger.error("ERROR during tool registration:", registrationError);
-    if (!isTestMode) {
-      // Exit if not in test mode
-      process.exit(1);
-    }
-  }
-}
+/**
+ * Map tool names to their handler functions.
+ * This acts as the router for the CallToolRequestSchema handler.
+ */
+const toolHandlers: Record<string, ToolHandler> = {
+  // Task Actions
+  reclaim_list_tasks: taskActions.handleListTasks,
+  reclaim_get_task: taskActions.handleGetTask,
+  reclaim_mark_complete: taskActions.handleMarkComplete,
+  reclaim_mark_incomplete: taskActions.handleMarkIncomplete,
+  reclaim_delete_task: taskActions.handleDeleteTask,
+  reclaim_add_time: taskActions.handleAddTime,
+  reclaim_start_timer: taskActions.handleStartTimer,
+  reclaim_stop_timer: taskActions.handleStopTimer,
+  reclaim_log_work: taskActions.handleLogWork,
+  reclaim_clear_exceptions: taskActions.handleClearExceptions,
+  reclaim_prioritize: taskActions.handlePrioritize,
+  // Task CRUD
+  reclaim_create_task: taskCrud.handleCreateTask,
+  reclaim_update_task: taskCrud.handleUpdateTask, // This assignment should now be valid
+};
 
 /**
  * Initializes the Reclaim MCP Server with the provided configuration.
  * - Sets up server info.
- * - Registers tool handlers and attempts to register metadata via server.tool.
- * - Registers resources.
+ * - Registers EXPLICIT handlers for ListToolsRequestSchema and CallToolRequestSchema.
  * - Returns the server instance but does not connect it to a transport.
  *
  * @param config - Optional configuration for server initialization
@@ -132,9 +117,9 @@ export function initializeServer(config: ServerConfig = {}): Server {
     logger.error("FATAL ERROR: RECLAIM_API_KEY environment variable is not set.");
     process.exit(1);
   } else if (apiKey) {
-    logger.error("Reclaim API Token found in environment variables.");
+    logger.error("Reclaim API Token found.");
   } else {
-    logger.error("Running in test mode with no API key or mock client.");
+    logger.error("Running in test mode with no API key or using mock client.");
   }
 
   const server = new Server(serverInfo);
@@ -143,8 +128,65 @@ export function initializeServer(config: ServerConfig = {}): Server {
   // Log SDK version for debugging
   logSdkVersion();
 
-  // Register all tools with the server
-  registerServerTools(server, apiClient, isTestMode);
+  // --- Register EXPLICIT Handlers ---
+
+  // 1. ListTools Handler: Returns the static list of tool definitions.
+  logger.error("Registering ListToolsRequestSchema handler...");
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    logger.debug("ListTools request received. Returning definitions.");
+    // Ensure the structure matches { tools: [...] }
+    // The imported toolDefinitions should now have the correct type.
+    return {
+      tools: toolDefinitions,
+    };
+  });
+  logger.error("ListToolsRequestSchema handler registered.");
+
+  // 2. CallTool Handler: Routes requests to the appropriate handler function.
+  logger.error("Registering CallToolRequestSchema handler...");
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const toolName = request.params.name;
+    const args = request.params.arguments;
+
+    logger.debug(`CallTool request received for tool: ${toolName}`);
+    logger.debug(`Arguments: ${JSON.stringify(args)}`);
+
+    const handler = toolHandlers[toolName];
+
+    if (handler) {
+      try {
+        // Call the specific handler function, passing the raw arguments and the API client
+        const result: CallToolResult = await handler(args, apiClient); // Result is typed
+        logger.debug(`Tool ${toolName} executed successfully.`);
+        return result;
+      } catch (error: unknown) {
+        logger.error(`Error executing tool ${toolName}:`, error);
+        // Handle Zod validation errors or other exceptions from the handler
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "An unknown error occurred during tool execution.";
+        // Construct the error result conforming to CallToolResult
+        const errorResult: CallToolResult = {
+          isError: true,
+          content: [{ type: "text", text: `Error calling ${toolName}: ${errorMessage}` }], // Explicitly TextContent
+        };
+        return errorResult;
+      }
+    } else {
+      logger.error(`Tool not found: ${toolName}`);
+      // Construct the error result conforming to CallToolResult
+      const errorResult: CallToolResult = {
+        isError: true,
+        content: [{ type: "text", text: `Tool "${toolName}" not found.` }], // Explicitly TextContent
+      };
+      return errorResult;
+    }
+  });
+  logger.error("CallToolRequestSchema handler registered.");
+
+  // Note: Resource registration (if any) would still happen here, e.g.:
+  // registerTaskResources(server as unknown as McpServer, apiClient); // If you have resources
 
   return server;
 }
@@ -154,7 +196,7 @@ export function initializeServer(config: ServerConfig = {}): Server {
  */
 async function main(): Promise<void> {
   logger.error(`Initializing ${serverInfo.name} v${serverInfo.version}...`);
-  const server = initializeServer(); // Uses default API client
+  const server = initializeServer(); // Uses default API client and explicit handlers
 
   logger.error("Attempting to connect via StdioServerTransport...");
   const transport = new StdioServerTransport();

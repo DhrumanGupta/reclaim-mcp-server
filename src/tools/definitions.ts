@@ -1,10 +1,30 @@
 /**
- * @fileoverview Defines tool definitions in the exact format required by the MCP specification.
- * These definitions are used by the explicit ListToolsRequestSchema handler.
+ * @fileoverview Defines tool definitions in the format required by the MCP specification
+ * for the ListToolsRequestSchema handler.
  */
 
-// Tool definitions that match the exact format expected by MCP clients
-export const toolDefinitions = [
+// Tool annotations are defined directly in the tool definition object
+// No need to import ToolAnnotationFlags as it's not exported by the SDK
+// Import the type for JSON Schema Draft 7 for inputSchema validation
+// You might need to install this type definition if you haven't already:
+// pnpm add -D @types/json-schema
+import type { JSONSchema7 } from "json-schema";
+
+// Define an interface for a single tool definition based on MCP spec
+// We use JSONSchema7 for inputSchema for better type safety.
+interface ToolDefinition {
+  name: string;
+  description?: string;
+  inputSchema: JSONSchema7;
+  annotations?: {
+    readOnlyHint?: boolean;
+    idempotentHint?: boolean;
+    destructiveHint?: boolean;
+  }; // Define annotations directly
+}
+
+// Tool definitions array, now strongly typed
+export const toolDefinitions: ToolDefinition[] = [
   {
     name: "reclaim_list_tasks",
     description:
@@ -15,11 +35,17 @@ export const toolDefinitions = [
         filter: {
           type: "string",
           enum: ["active", "all"],
+          default: "active", // Add default here for schema clarity
           description:
             'Filter tasks: "active" (default) excludes ARCHIVED/CANCELLED/deleted; "all" includes all.',
         },
       },
-      required: [],
+      required: [], // No required properties
+    },
+    annotations: {
+      // Add annotations
+      readOnlyHint: true,
+      idempotentHint: true, // Listing tasks is idempotent
     },
   },
   {
@@ -36,6 +62,10 @@ export const toolDefinitions = [
       },
       required: ["taskId"],
     },
+    annotations: {
+      readOnlyHint: true,
+      idempotentHint: true,
+    },
   },
   {
     name: "reclaim_create_task",
@@ -44,23 +74,14 @@ export const toolDefinitions = [
     inputSchema: {
       type: "object",
       properties: {
-        title: {
-          type: "string",
-          description: "The title of the task.",
-        },
-        notes: {
-          type: "string",
-          description: "Optional notes about the task.",
-        },
+        title: { type: "string", description: "The title of the task.", minLength: 1 },
+        notes: { type: "string", description: "Optional notes about the task." },
         eventCategory: {
           type: "string",
           enum: ["WORK", "PERSONAL"],
           description: "Category of the task.",
         },
-        eventSubType: {
-          type: "string",
-          description: "Subcategory of the task.",
-        },
+        eventSubType: { type: "string", description: "Subcategory of the task." },
         priority: {
           type: "string",
           enum: ["P1", "P2", "P3", "P4"],
@@ -68,12 +89,10 @@ export const toolDefinitions = [
         },
         timeChunksRequired: {
           type: "integer",
-          description: "Number of 15-minute chunks required for this task.",
+          description: "Number of 15-minute chunks required.",
+          minimum: 1,
         },
-        onDeck: {
-          type: "boolean",
-          description: "Whether to prioritize this task.",
-        },
+        onDeck: { type: "boolean", description: "Whether to prioritize this task." },
         status: {
           type: "string",
           enum: ["NEW", "SCHEDULED", "IN_PROGRESS", "COMPLETE", "CANCELLED", "ARCHIVED"],
@@ -83,27 +102,33 @@ export const toolDefinitions = [
           oneOf: [
             {
               type: "integer",
+              minimum: 1,
               description: "Number of days from now for the deadline.",
             },
+            { type: "string", format: "date-time", description: "ISO 8601 date/time string." },
             {
               type: "string",
-              description: "ISO 8601 date/time string or YYYY-MM-DD format for the deadline.",
+              pattern: "^\\d{4}-\\d{2}-\\d{2}$",
+              description: "YYYY-MM-DD date format.",
             },
           ],
-          description: "Deadline for the task.",
+          description: "Deadline: days from now, ISO string, or YYYY-MM-DD.",
         },
         snoozeUntil: {
           oneOf: [
             {
               type: "integer",
-              description: "Number of days to snooze the task.",
+              minimum: 1,
+              description: "Number of days from now to snooze until.",
             },
+            { type: "string", format: "date-time", description: "ISO 8601 date/time string." },
             {
               type: "string",
-              description: "ISO 8601 date/time string or YYYY-MM-DD format to snooze until.",
+              pattern: "^\\d{4}-\\d{2}-\\d{2}$",
+              description: "YYYY-MM-DD date format.",
             },
           ],
-          description: "Date/time until the task is snoozed.",
+          description: "Snooze until: days from now, ISO string, or YYYY-MM-DD.",
         },
         eventColor: {
           type: "string",
@@ -125,6 +150,10 @@ export const toolDefinitions = [
       },
       required: ["title"],
     },
+    annotations: {
+      // Not idempotent because creating the same task twice results in two tasks
+      // Not read-only because it creates data
+    },
   },
   {
     name: "reclaim_update_task",
@@ -133,70 +162,59 @@ export const toolDefinitions = [
     inputSchema: {
       type: "object",
       properties: {
-        taskId: {
-          type: "integer",
-          description: "The unique ID of the task to update.",
-        },
-        title: {
-          type: "string",
-          description: "The title of the task.",
-        },
-        notes: {
-          type: "string",
-          description: "Notes about the task.",
-        },
-        eventCategory: {
-          type: "string",
-          enum: ["WORK", "PERSONAL"],
-          description: "Category of the task.",
-        },
-        eventSubType: {
-          type: "string",
-          description: "Subcategory of the task.",
-        },
+        taskId: { type: "integer", description: "The unique ID of the task to update." },
+        // Make other properties optional for update
+        title: { type: "string", description: "The new title of the task.", minLength: 1 },
+        notes: { type: "string", description: "New notes about the task (overwrites existing)." },
+        eventCategory: { type: "string", enum: ["WORK", "PERSONAL"], description: "New category." },
+        eventSubType: { type: "string", description: "New subcategory." },
         priority: {
           type: "string",
           enum: ["P1", "P2", "P3", "P4"],
-          description: "Priority level of the task.",
+          description: "New priority level.",
         },
         timeChunksRequired: {
           type: "integer",
-          description: "Number of 15-minute chunks required for this task.",
+          description: "New number of 15-minute chunks.",
+          minimum: 1,
         },
-        onDeck: {
-          type: "boolean",
-          description: "Whether to prioritize this task.",
-        },
+        onDeck: { type: "boolean", description: "New prioritization status." },
         status: {
           type: "string",
           enum: ["NEW", "SCHEDULED", "IN_PROGRESS", "COMPLETE", "CANCELLED", "ARCHIVED"],
-          description: "Status of the task.",
+          description: "New status.",
         },
         deadline: {
           oneOf: [
             {
               type: "integer",
+              minimum: 1,
               description: "Number of days from now for the deadline.",
             },
+            { type: "string", format: "date-time", description: "ISO 8601 date/time string." },
             {
               type: "string",
-              description: "ISO 8601 date/time string or YYYY-MM-DD format for the deadline.",
+              pattern: "^\\d{4}-\\d{2}-\\d{2}$",
+              description: "YYYY-MM-DD date format.",
             },
           ],
-          description: "Deadline for the task.",
+          description: "New deadline: days from now, ISO string, or YYYY-MM-DD.",
         },
         snoozeUntil: {
           oneOf: [
             {
               type: "integer",
-              description: "Number of days to snooze the task.",
+              minimum: 1,
+              description: "Number of days from now to snooze until.",
             },
+            { type: "string", format: "date-time", description: "ISO 8601 date/time string." },
             {
               type: "string",
-              description: "ISO 8601 date/time string or YYYY-MM-DD format to snooze until.",
+              pattern: "^\\d{4}-\\d{2}-\\d{2}$",
+              description: "YYYY-MM-DD date format.",
             },
           ],
-          description: "Date/time until the task is snoozed.",
+          description: "New snooze until: days from now, ISO string, or YYYY-MM-DD.",
         },
         eventColor: {
           type: "string",
@@ -213,10 +231,17 @@ export const toolDefinitions = [
             "BASIL",
             "TOMATO",
           ],
-          description: "Color of the task in the calendar.",
+          description: "New color for the task.",
         },
       },
-      required: ["taskId"],
+      required: ["taskId"], // Only taskId is required, others are optional updates
+      minProperties: 2, // Require taskId + at least one field to update
+    },
+    annotations: {
+      // Technically idempotent if the update object is identical on subsequent calls,
+      // but often used non-idempotently (e.g., changing status multiple times).
+      // Mark as idempotent: false to be safe.
+      idempotentHint: false,
     },
   },
   {
@@ -226,12 +251,12 @@ export const toolDefinitions = [
     inputSchema: {
       type: "object",
       properties: {
-        taskId: {
-          type: "integer",
-          description: "The unique ID of the task to mark as complete.",
-        },
+        taskId: { type: "integer", description: "The unique ID of the task to mark as complete." },
       },
       required: ["taskId"],
+    },
+    annotations: {
+      idempotentHint: true, // Marking complete multiple times has no further effect
     },
   },
   {
@@ -248,6 +273,9 @@ export const toolDefinitions = [
       },
       required: ["taskId"],
     },
+    annotations: {
+      idempotentHint: true, // Marking incomplete multiple times has no further effect
+    },
   },
   {
     name: "reclaim_delete_task",
@@ -256,12 +284,13 @@ export const toolDefinitions = [
     inputSchema: {
       type: "object",
       properties: {
-        taskId: {
-          type: "integer",
-          description: "The unique ID of the task to delete.",
-        },
+        taskId: { type: "integer", description: "The unique ID of the task to delete." },
       },
       required: ["taskId"],
+    },
+    annotations: {
+      idempotentHint: true, // Deleting multiple times has no further effect after the first
+      destructiveHint: true, // This is a destructive action
     },
   },
   {
@@ -271,16 +300,13 @@ export const toolDefinitions = [
     inputSchema: {
       type: "object",
       properties: {
-        taskId: {
-          type: "integer",
-          description: "The unique ID of the task to add time to.",
-        },
-        minutes: {
-          type: "integer",
-          description: "Number of minutes to add to the task schedule.",
-        },
+        taskId: { type: "integer", description: "The unique ID of the task to add time to." },
+        minutes: { type: "integer", description: "Number of minutes to add.", minimum: 1 },
       },
       required: ["taskId", "minutes"],
+    },
+    annotations: {
+      // Not idempotent as adding time multiple times increases total time
     },
   },
   {
@@ -297,6 +323,9 @@ export const toolDefinitions = [
       },
       required: ["taskId"],
     },
+    annotations: {
+      idempotentHint: true, // Starting an already started timer likely has no effect
+    },
   },
   {
     name: "reclaim_stop_timer",
@@ -312,6 +341,9 @@ export const toolDefinitions = [
       },
       required: ["taskId"],
     },
+    annotations: {
+      idempotentHint: true, // Stopping an already stopped timer likely has no effect
+    },
   },
   {
     name: "reclaim_log_work",
@@ -320,21 +352,22 @@ export const toolDefinitions = [
     inputSchema: {
       type: "object",
       properties: {
-        taskId: {
-          type: "integer",
-          description: "The unique ID of the task to log work against.",
-        },
-        minutes: {
-          type: "integer",
-          description: "Number of minutes worked.",
-        },
+        taskId: { type: "integer", description: "The unique ID of the task to log work against." },
+        minutes: { type: "integer", description: "Number of minutes worked.", minimum: 1 },
         end: {
           type: "string",
-          description:
-            "Optional end time/date of the work log (ISO 8601 or YYYY-MM-DD). Defaults to now.",
+          description: "Optional end time/date (ISO 8601 or YYYY-MM-DD). Defaults to now.",
+          oneOf: [
+            // More specific typing for end date
+            { format: "date-time" },
+            { pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+          ],
         },
       },
       required: ["taskId", "minutes"],
+    },
+    annotations: {
+      // Not idempotent as logging work multiple times increases total logged time
     },
   },
   {
@@ -346,10 +379,13 @@ export const toolDefinitions = [
       properties: {
         taskId: {
           type: "integer",
-          description: "The unique ID of the task whose scheduling exceptions should be cleared.",
+          description: "The unique ID of the task whose exceptions should be cleared.",
         },
       },
       required: ["taskId"],
+    },
+    annotations: {
+      idempotentHint: true, // Clearing exceptions multiple times has no further effect
     },
   },
   {
@@ -359,12 +395,12 @@ export const toolDefinitions = [
     inputSchema: {
       type: "object",
       properties: {
-        taskId: {
-          type: "integer",
-          description: "The unique ID of the task to prioritize.",
-        },
+        taskId: { type: "integer", description: "The unique ID of the task to prioritize." },
       },
       required: ["taskId"],
+    },
+    annotations: {
+      idempotentHint: true, // Prioritizing multiple times has no further effect
     },
   },
 ];

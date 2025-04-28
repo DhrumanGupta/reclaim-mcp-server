@@ -1,20 +1,18 @@
 /**
- * @fileoverview Registers MCP Tools for creating and updating Reclaim.ai tasks (CRUD operations).
+ * @fileoverview Provides handler functions for MCP Tools related to creating and updating Reclaim.ai tasks.
+ * These functions are called by the main CallToolRequestSchema handler in index.ts.
  */
 
+import type { CallToolResult, TextContent } from "@modelcontextprotocol/sdk/types.js"; // Import necessary types with .js extension
 import { z } from "zod";
-import type { ZodRawShape, ZodTypeAny } from "zod"; // Import ZodRawShape type
-
 import * as defaultApi from "../reclaim-client.js";
+import type { ReclaimApiClient, TaskInputData } from "../types/reclaim.js";
 import { wrapApiCall } from "../utils.js";
 
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { ReclaimApiClient, TaskInputData } from "../types/reclaim.js";
+// --- Zod Schemas for Argument Validation ---
+// These should align with the inputSchema in definitions.js but provide runtime validation.
 
-// Define type for the API client methods needed here
-type CrudApiClient = Pick<ReclaimApiClient, "createTask" | "updateTask">;
-
-// Define complex types separately for reuse in raw shapes
+// Reusable complex types for schemas
 const deadlineSchemaType = z
   .union([
     z.number().int().positive("Deadline days must be a positive integer."),
@@ -51,90 +49,95 @@ const eventColorSchemaType = z
   ])
   .optional();
 
-/**
- * Registers task creation and update tools with the provided MCP Server instance.
- * Uses the (name, description, rawShape, handler) signature based on TS errors and analysis.
- * Handler parameter types are inferred using z.infer.
- *
- * @param server - The McpServer instance to register handlers against.
- * @param apiClient - Optional API client for dependency injection (used in testing).
- */
-export function registerTaskCrudTools(
-  server: McpServer,
-  apiClient: CrudApiClient = defaultApi, // Use the specific client type
-): void {
-  // --- Define Raw Shapes for Zod Schemas ---
-  const taskPropertiesShape: ZodRawShape = {
-    title: z.string().min(1, "Title cannot be empty."),
-    notes: z.string().optional(),
-    eventCategory: z.enum(["WORK", "PERSONAL"]).optional(),
-    eventSubType: z.string().optional(),
-    priority: z.enum(["P1", "P2", "P3", "P4"]).optional(),
-    timeChunksRequired: z
-      .number()
-      .int()
-      .positive("Time chunks must be a positive integer.")
-      .optional(),
-    onDeck: z.boolean().optional(),
-    status: z
-      .enum(["NEW", "SCHEDULED", "IN_PROGRESS", "COMPLETE", "CANCELLED", "ARCHIVED"])
-      .optional(),
-    deadline: deadlineSchemaType,
-    snoozeUntil: snoozeUntilSchemaType,
-    eventColor: eventColorSchemaType,
-  };
-  // Infer type for handler params from the shape
-  type CreateTaskParams = z.infer<z.ZodObject<typeof taskPropertiesShape>>;
+// Schema for Create Task
+const createTaskSchema = z.object({
+  title: z.string().min(1, "Title cannot be empty."),
+  notes: z.string().optional(),
+  eventCategory: z.enum(["WORK", "PERSONAL"]).optional(),
+  eventSubType: z.string().optional(),
+  priority: z.enum(["P1", "P2", "P3", "P4"]).optional(),
+  timeChunksRequired: z
+    .number()
+    .int()
+    .positive("Time chunks must be a positive integer.")
+    .optional(),
+  onDeck: z.boolean().optional(),
+  status: z
+    .enum(["NEW", "SCHEDULED", "IN_PROGRESS", "COMPLETE", "CANCELLED", "ARCHIVED"])
+    .optional(),
+  deadline: deadlineSchemaType,
+  snoozeUntil: snoozeUntilSchemaType,
+  eventColor: eventColorSchemaType,
+});
+type CreateTaskParams = z.infer<typeof createTaskSchema>;
 
-  // --- CREATE Task Tool ---
-  server.tool(
-    "reclaim_create_task",
-    "Create a new task in Reclaim.ai. Requires at least a 'title'. Other fields like 'timeChunksRequired', 'priority', 'deadline', 'notes', 'eventCategory' are optional but recommended.", // Description (2nd arg)
-    taskPropertiesShape, // RAW SHAPE object (3rd arg)
-    // Use inferred type for params
-    async (params: CreateTaskParams) => {
-      // Now params is strongly typed
-      return wrapApiCall(apiClient.createTask(params as TaskInputData));
-    },
-  );
+// Schema for Update Task
+const updateTaskSchema = z.object({
+  taskId: z.number().int().positive("Task ID must be a positive integer."),
+  title: z.string().min(1, "Title cannot be empty.").optional(),
+  notes: z.string().optional(),
+  eventCategory: z.enum(["WORK", "PERSONAL"]).optional(),
+  eventSubType: z.string().optional(),
+  priority: z.enum(["P1", "P2", "P3", "P4"]).optional(),
+  timeChunksRequired: z
+    .number()
+    .int()
+    .positive("Time chunks must be a positive integer.")
+    .optional(),
+  onDeck: z.boolean().optional(),
+  status: z
+    .enum(["NEW", "SCHEDULED", "IN_PROGRESS", "COMPLETE", "CANCELLED", "ARCHIVED"])
+    .optional(),
+  deadline: deadlineSchemaType,
+  snoozeUntil: snoozeUntilSchemaType,
+  eventColor: eventColorSchemaType,
+});
+type UpdateTaskParams = z.infer<typeof updateTaskSchema>;
 
-  // --- UPDATE Task Tool ---
-  const updateTaskShape: ZodRawShape = {
-    taskId: z.number().int().positive("Task ID must be a positive integer."),
-    title: z.string().min(1, "Title cannot be empty.").optional(),
-    notes: z.string().optional(),
-    eventCategory: z.enum(["WORK", "PERSONAL"]).optional(),
-    eventSubType: z.string().optional(),
-    priority: z.enum(["P1", "P2", "P3", "P4"]).optional(),
-    timeChunksRequired: z
-      .number()
-      .int()
-      .positive("Time chunks must be a positive integer.")
-      .optional(),
-    onDeck: z.boolean().optional(),
-    status: z
-      .enum(["NEW", "SCHEDULED", "IN_PROGRESS", "COMPLETE", "CANCELLED", "ARCHIVED"])
-      .optional(),
-    deadline: deadlineSchemaType,
-    snoozeUntil: snoozeUntilSchemaType,
-    eventColor: eventColorSchemaType,
-  };
-  // Infer type for handler params from the shape
-  type UpdateTaskParams = z.infer<z.ZodObject<typeof updateTaskShape>>;
+// Define type for the API client methods needed here
+type CrudApiClient = Pick<ReclaimApiClient, "createTask" | "updateTask">;
 
-  server.tool(
-    "reclaim_update_task",
-    "Update specific fields of an existing Reclaim.ai task using its ID. This performs a PATCH operation – only provided fields are changed.\nIMPORTANT: Updating fields like 'notes' overwrites the existing content. To *append* to notes, you MUST first use 'reclaim_get_task' to fetch the current notes, then provide the full combined text (old + new) in the 'notes' field of this update call.", // Description (2nd arg)
-    updateTaskShape, // RAW SHAPE object (3rd arg)
-    // Use inferred type for params
-    async (params: UpdateTaskParams) => {
-      // Now params is strongly typed
-      const { taskId, ...updateData } = params;
+// --- Exported Handler Functions ---
 
-      if (Object.keys(updateData).length === 0) {
-        throw new Error("Update requires at least one field to change besides taskId.");
-      }
-      return wrapApiCall(apiClient.updateTask(taskId, updateData as TaskInputData));
-    },
-  );
+export async function handleCreateTask(
+  params: unknown,
+  apiClient: CrudApiClient = defaultApi,
+): Promise<CallToolResult> {
+  // Add explicit return type promise
+  // Validate parameters against the Zod schema
+  const validatedParams = createTaskSchema.parse(params) as CreateTaskParams;
+  // Pass the validated parameters (already conforming to TaskInputData structure)
+  return wrapApiCall(apiClient.createTask(validatedParams as TaskInputData));
 }
+
+export async function handleUpdateTask(
+  params: unknown,
+  apiClient: CrudApiClient = defaultApi,
+): Promise<CallToolResult> {
+  // Add explicit return type promise
+  // Validate parameters against the Zod schema
+  const validatedParams = updateTaskSchema.parse(params) as UpdateTaskParams;
+  const { taskId, ...updateData } = validatedParams;
+
+  // Ensure there's something to update
+  if (Object.keys(updateData).length === 0) {
+    // Explicitly construct the return object matching CallToolResult
+    const errorContent: TextContent[] = [
+      { type: "text", text: "Update requires at least one field to change besides taskId." },
+    ];
+    const result: CallToolResult = {
+      isError: true,
+      content: errorContent, // Ensure content matches TextContent[] type
+    };
+    return result;
+  }
+
+  // Pass the validated taskId and updateData (conforming to TaskInputData)
+  return wrapApiCall(apiClient.updateTask(taskId, updateData as TaskInputData));
+}
+
+// Export schemas if needed elsewhere
+export const schemas = {
+  createTaskSchema,
+  updateTaskSchema,
+};

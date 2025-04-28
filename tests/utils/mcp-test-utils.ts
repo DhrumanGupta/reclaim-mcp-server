@@ -1,117 +1,76 @@
 /**
- * @fileoverview Utility functions for testing the MCP protocol layer
- * Provides helper methods to set up an MCP server and client for testing
+ * @fileoverview Utilities for setting up and interacting with the MCP server during integration tests.
  */
 
-// TODO: Fix the imports from the ModelContextProtocol SDK
-// The current imports cause TypeScript errors due to path resolution issues
-// For now, we'll use type declarations and dynamic imports to avoid compilation errors
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 
-import { testLogger } from "./logger.js";
-import { createReclaimApiMock } from "./reclaim-api-mock.js";
-import { registerTaskActionTools } from "../../src/tools/taskActions.js";
-import { registerTaskCrudTools } from "../../src/tools/taskCrud.js";
-import { registerTaskResources } from "../../src/resources/tasks.js";
+import { initializeServer } from "../../src/index.js"; // Use the main server initializer
+import type { ReclaimApiClient } from "../../src/types/reclaim.js"; // Import API client type
 
-// Type declarations to match the SDK interfaces we need
-declare class McpServer {
-  constructor(info: ServerInfo);
-  connect(transport: unknown): Promise<void>;
-  tool(name: string, schema: unknown, handler: Function): void;
-  resource(uri: string, handler: Function): void;
-}
+// Removed imports for registerTaskActionTools and registerTaskCrudTools as they no longer exist
 
-declare class McpClient {
-  connect(transport: unknown): Promise<void>;
-  callTool(name: string, params: Record<string, unknown>): Promise<CallToolResult>;
-  readResource(uri: string): Promise<ResourceResult>;
-}
+/**
+ * Sets up a test environment with a server instance and a connected client.
+ * Allows injecting a mock API client for testing tool handlers.
+ *
+ * @param mockApiClient - A mock implementation of the ReclaimApiClient for testing.
+ * @returns An object containing the initialized server, client, and transport.
+ */
+export async function setupTestEnvironment(mockApiClient: ReclaimApiClient) {
+  // Initialize the server using the main entry point, injecting the mock client
+  const server = initializeServer({
+    isTestMode: true, // Indicate test mode
+    apiClient: mockApiClient, // Inject the mock API client
+  });
 
-declare class MemoryTransport {
-  serverTransport: unknown;
-  clientTransport: unknown;
-}
+  // For testing, we need to provide the server parameters
+  // Convert process.env to Record<string, string> by removing undefined values
+  const env: Record<string, string> = {};
+  Object.entries(process.env).forEach(([key, value]) => {
+    if (value !== undefined) {
+      env[key] = value;
+    }
+  });
 
-interface ServerInfo {
-  name: string;
-  version: string;
-  publisher: string;
-  description: string;
-  homepage?: string;
-  supportUrl?: string;
-}
+  const transport = new StdioClientTransport({
+    command: "node",
+    args: ["dist/index.js"],
+    env,
+  });
 
-interface CallToolResult {
-  error?: string;
-  value?: unknown;
-}
+  // Start the transport
+  await transport.start();
 
-interface ResourceResult {
-  contents: Array<{ text: string }>;
+  // Connect server to transport
+  await server.connect(transport);
+
+  // Create client with server info
+  const client = new Client({
+    name: "reclaim-mcp-test-client",
+    version: "1.0.0",
+  });
+
+  // Connect client with transport info
+  await client.connect(transport);
+
+  return { server, client, transport };
 }
 
 /**
- * Due to issues with the SDK imports, we're temporarily disabling the MCP protocol testing
- * functionality. This function will throw an error with a meaningful message when called.
+ * Cleans up the test environment by disconnecting the client and server.
  *
- * This will be fixed in a future update to properly test the MCP protocol layer.
- *
- * @param testName - The name of the test for logging purposes
- * @param mockApi - Optional mock API client to inject (defaults to creating a new mock)
- * @throws Error indicating that MCP protocol testing is not currently available
+ * @param client - The test client instance.
+ * @param server - The test server instance.
+ * @param transport - The test transport instance.
  */
-export async function setupMcpServerAndClient(
-  testName: string,
-  mockApi?: ReturnType<typeof createReclaimApiMock>,
+export async function cleanupTestEnvironment(
+  client: Client,
+  // server: Server, // Server doesn't have an explicit disconnect in this setup
+  transport: StdioClientTransport,
 ) {
-  testLogger.step(testName, "MCP protocol testing is not currently available");
-  throw new Error(
-    "MCP protocol testing is not currently available due to SDK import issues. " +
-      "Tests need to be updated to properly import from @modelcontextprotocol/sdk. " +
-      "For now, please use the API client mocks directly instead of the MCP protocol layer.",
-  );
-}
-
-/**
- * Helper function to call an MCP tool and handle errors
- * Currently disabled due to SDK import issues.
- *
- * @param client - The MCP client instance
- * @param toolName - The name of the tool to call
- * @param params - The parameters to pass to the tool
- * @param testName - The name of the test for logging
- * @throws Error indicating that MCP protocol testing is not currently available
- */
-export async function callMcpTool(
-  client: any,
-  toolName: string,
-  params: Record<string, unknown>,
-  testName: string,
-): Promise<CallToolResult> {
-  testLogger.step(testName, `MCP protocol testing is not currently available`);
-  throw new Error(
-    "MCP protocol testing is not currently available due to SDK import issues. " +
-      "Tests need to be updated to properly import from @modelcontextprotocol/sdk.",
-  );
-}
-
-/**
- * Helper function to read an MCP resource and handle errors
- * Currently disabled due to SDK import issues.
- *
- * @param client - The MCP client instance
- * @param resourceUri - The URI of the resource to read
- * @param testName - The name of the test for logging
- * @throws Error indicating that MCP protocol testing is not currently available
- */
-export async function readMcpResource(
-  client: any,
-  resourceUri: string,
-  testName: string,
-): Promise<string> {
-  testLogger.step(testName, `MCP protocol testing is not currently available`);
-  throw new Error(
-    "MCP protocol testing is not currently available due to SDK import issues. " +
-      "Tests need to be updated to properly import from @modelcontextprotocol/sdk.",
-  );
+  // client.disconnect() is no longer available
+  // transport handles closing the connection streams implicitly or upon test process exit
+  // No explicit server.disconnect() needed for stdio transport typically
 }
