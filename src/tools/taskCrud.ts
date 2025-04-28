@@ -8,6 +8,7 @@ import * as defaultApi from "../reclaim-client.js";
 import { wrapApiCall } from "../utils.js";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ZodRawShape, ZodTypeAny } from "zod"; // Import ZodRawShape type
 import type { TaskInputData } from "../types/reclaim.js";
 
 // Define type for the API client to support dependency injection
@@ -16,9 +17,46 @@ type ReclaimApiClient = {
   updateTask: typeof defaultApi.updateTask;
 };
 
+// Define complex types separately for reuse in raw shapes
+const deadlineSchemaType = z
+  .union([
+    z.number().int().positive("Deadline days must be a positive integer."),
+    z.string().datetime({ message: "Deadline must be a valid ISO 8601 date/time string." }),
+    z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Deadline date must be in YYYY-MM-DD format." }),
+  ])
+  .optional();
+
+const snoozeUntilSchemaType = z
+  .union([
+    z.number().int().positive("Snooze days must be a positive integer."),
+    z.string().datetime({ message: "Snooze time must be a valid ISO 8601 date/time string." }),
+    z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Snooze date must be in YYYY-MM-DD format." }),
+  ])
+  .optional();
+
+const eventColorSchemaType = z
+  .enum([
+    "LAVENDER",
+    "SAGE",
+    "GRAPE",
+    "FLAMINGO",
+    "BANANA",
+    "TANGERINE",
+    "PEACOCK",
+    "GRAPHITE",
+    "BLUEBERRY",
+    "BASIL",
+    "TOMATO",
+  ])
+  .optional();
+
 /**
  * Registers task creation and update tools with the provided MCP Server instance.
- * Uses the (name, schema, handler) signature for server.tool.
+ * Uses the (name, description, rawShape, handler) signature based on TS errors and analysis.
  *
  * @param server - The McpServer instance to register tools against.
  * @param apiClient - Optional API client for dependency injection (used in testing)
@@ -27,111 +65,71 @@ export function registerTaskCrudTools(
   server: McpServer,
   apiClient: ReclaimApiClient = defaultApi,
 ): void {
-  // --- Zod Schema for Task Properties (used in both create and update) ---
-  const taskPropertiesSchema = {
+  // --- Define Raw Shapes for Zod Schemas ---
+  const taskPropertiesShape: ZodRawShape = {
     title: z.string().min(1, "Title cannot be empty."),
     notes: z.string().optional(),
     eventCategory: z.enum(["WORK", "PERSONAL"]).optional(),
-    eventSubType: z.string().optional(), // e.g., "MEETING", "FOCUS" - API specific
+    eventSubType: z.string().optional(),
     priority: z.enum(["P1", "P2", "P3", "P4"]).optional(),
     timeChunksRequired: z
       .number()
       .int()
       .positive("Time chunks must be a positive integer.")
-      .optional(), // 1 chunk = 15 mins
-    onDeck: z.boolean().optional(), // Prioritize task
+      .optional(),
+    onDeck: z.boolean().optional(),
     status: z
       .enum(["NEW", "SCHEDULED", "IN_PROGRESS", "COMPLETE", "CANCELLED", "ARCHIVED"])
       .optional(),
-    // Deadline: number of days from now OR ISO datetime string OR YYYY-MM-DD date string
-    deadline: z
-      .union([
-        z.number().int().positive("Deadline days must be a positive integer."),
-        z.string().datetime({
-          message: "Deadline must be a valid ISO 8601 date/time string.",
-        }),
-        z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
-          message: "Deadline date must be in YYYY-MM-DD format.",
-        }),
-      ])
-      .optional(),
-    // SnoozeUntil: number of days from now OR ISO datetime string OR YYYY-MM-DD date string
-    snoozeUntil: z
-      .union([
-        z.number().int().positive("Snooze days must be a positive integer."),
-        z.string().datetime({
-          message: "Snooze time must be a valid ISO 8601 date/time string.",
-        }),
-        z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
-          message: "Snooze date must be in YYYY-MM-DD format.",
-        }),
-      ])
-      .optional(),
-    eventColor: z
-      .enum([
-        // Based on Reclaim's standard colors
-        "LAVENDER",
-        "SAGE",
-        "GRAPE",
-        "FLAMINGO",
-        "BANANA",
-        "TANGERINE",
-        "PEACOCK",
-        "GRAPHITE",
-        "BLUEBERRY",
-        "BASIL",
-        "TOMATO",
-      ])
-      .optional(),
+    deadline: deadlineSchemaType,
+    snoozeUntil: snoozeUntilSchemaType,
+    eventColor: eventColorSchemaType,
   };
 
   // --- CREATE Task Tool ---
   server.tool(
     "reclaim_create_task",
-    "Create a new task in Reclaim.ai. Requires at least a 'title'. Other fields like 'timeChunksRequired', 'priority', 'deadline', 'notes', 'eventCategory' are optional but recommended.",
-    // Schema for create: title is required, other properties are optional
-    taskPropertiesSchema, // Directly use the defined schema object
+    "Create a new task in Reclaim.ai. Requires at least a 'title'. Other fields like 'timeChunksRequired', 'priority', 'deadline', 'notes', 'eventCategory' are optional but recommended.", // Description (2nd arg)
+    taskPropertiesShape, // RAW SHAPE object (3rd arg)
     async (params) => {
-      // The 'params' object directly matches the schema structure
-      // Cast to TaskInputData for the API client (which handles 'deadline'/'due' conversion)
+      // Params type should be inferred from taskPropertiesShape
       return wrapApiCall(apiClient.createTask(params as TaskInputData));
     },
   );
 
   // --- UPDATE Task Tool ---
+  const updateTaskShape: ZodRawShape = {
+    taskId: z.number().int().positive("Task ID must be a positive integer."),
+    title: z.string().min(1, "Title cannot be empty.").optional(),
+    notes: z.string().optional(),
+    eventCategory: z.enum(["WORK", "PERSONAL"]).optional(),
+    eventSubType: z.string().optional(),
+    priority: z.enum(["P1", "P2", "P3", "P4"]).optional(),
+    timeChunksRequired: z
+      .number()
+      .int()
+      .positive("Time chunks must be a positive integer.")
+      .optional(),
+    onDeck: z.boolean().optional(),
+    status: z
+      .enum(["NEW", "SCHEDULED", "IN_PROGRESS", "COMPLETE", "CANCELLED", "ARCHIVED"])
+      .optional(),
+    deadline: deadlineSchemaType, // Use defined type
+    snoozeUntil: snoozeUntilSchemaType, // Use defined type
+    eventColor: eventColorSchemaType, // Use defined type
+  };
+
   server.tool(
     "reclaim_update_task",
-    "Update specific fields of an existing Reclaim.ai task using its ID. This performs a PATCH operation – only provided fields are changed.\nIMPORTANT: Updating fields like 'notes' overwrites the existing content. To *append* to notes, you MUST first use 'reclaim_get_task' to fetch the current notes, then provide the full combined text (old + new) in the 'notes' field of this update call.",
-    // Schema for update: requires taskId, all other properties are optional
-    {
-      taskId: z.number().int().positive("Task ID must be a positive integer."),
-      // Make all properties from the base schema optional for update
-      title: taskPropertiesSchema.title.optional(),
-      notes: taskPropertiesSchema.notes,
-      eventCategory: taskPropertiesSchema.eventCategory,
-      eventSubType: taskPropertiesSchema.eventSubType,
-      priority: taskPropertiesSchema.priority,
-      timeChunksRequired: taskPropertiesSchema.timeChunksRequired,
-      onDeck: taskPropertiesSchema.onDeck,
-      status: taskPropertiesSchema.status,
-      deadline: taskPropertiesSchema.deadline,
-      snoozeUntil: taskPropertiesSchema.snoozeUntil,
-      eventColor: taskPropertiesSchema.eventColor,
-    },
+    "Update specific fields of an existing Reclaim.ai task using its ID. This performs a PATCH operation – only provided fields are changed.\nIMPORTANT: Updating fields like 'notes' overwrites the existing content. To *append* to notes, you MUST first use 'reclaim_get_task' to fetch the current notes, then provide the full combined text (old + new) in the 'notes' field of this update call.", // Description (2nd arg)
+    updateTaskShape, // RAW SHAPE object (3rd arg)
     async (params) => {
-      // Extract taskId, the rest are the update fields
+      // Params type should be inferred from updateTaskShape
       const { taskId, ...updateData } = params;
 
-      // Ensure we have at least one property to update besides taskId
       if (Object.keys(updateData).length === 0) {
-        // Throw an error that wrapApiCall will catch and format
         throw new Error("Update requires at least one field to change besides taskId.");
       }
-
-      // Cast updateData to TaskInputData for the API client
-      // Note: The API client internally handles 'deadline'/'due' and 'snoozeUntil' parsing.
-      // The warning about preserving notes needs to be handled by the *calling* LLM workflow,
-      // as this tool simply performs the PATCH operation provided.
       return wrapApiCall(apiClient.updateTask(taskId, updateData as TaskInputData));
     },
   );
