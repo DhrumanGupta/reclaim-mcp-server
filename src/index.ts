@@ -3,23 +3,16 @@
  * Initializes the server, registers tools and resources, and connects the transport.
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-// We don't need ListToolsRequestSchema if we aren't handling it manually
-// import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/schema.js";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-// No need for zod-to-json-schema anymore
-// import { zodToJsonSchema } from "zod-to-json-schema";
-// No need for z here if not converting schemas
-// import { z } from "zod";
 import "dotenv/config"; // Load environment variables from .env file
 
 import { logger } from "./logger.js";
 import { registerTaskResources } from "./resources/tasks.js";
-// Import functions that register tools AND handlers using server.tool
+import { registerExampleTool } from "./tools/example-tool.js";
 import { registerTaskActionTools } from "./tools/taskActions.js";
 import { registerTaskCrudTools } from "./tools/taskCrud.js";
-// No longer importing centralized definitions
-// import { toolDefinitions } from "./tools/definitions.js";
 
 // --- Server Information ---
 import { createRequire } from "node:module";
@@ -62,6 +55,70 @@ export interface ServerConfig {
 }
 
 /**
+ * Logs SDK version information for debugging.
+ */
+function logSdkVersion(): void {
+  try {
+    const sdkPackage = require("@modelcontextprotocol/sdk/package.json");
+    logger.error(`MCP SDK version: ${sdkPackage.version}`);
+  } catch (e) {
+    logger.error("Could not determine MCP SDK version", e);
+  }
+}
+
+/**
+ * Registers all MCP tools with the provided server.
+ *
+ * @param server - The server instance to register tools with
+ * @param apiClient - The API client to use for tool handlers
+ * @param isTestMode - Whether the server is running in test mode
+ */
+function registerServerTools(
+  server: Server,
+  apiClient: ReclaimApiClient,
+  isTestMode: boolean,
+): void {
+  try {
+    // Register example tool first (to test schema formatting)
+    logger.error("Registering example tool...");
+    registerExampleTool(server as unknown as McpServer);
+
+    // Register task-related tools
+    logger.error("Registering MCP tools and handlers...");
+    registerTaskActionTools(server as unknown as McpServer, apiClient);
+    registerTaskCrudTools(server as unknown as McpServer, apiClient);
+
+    // Debug logging to see what tools were registered
+    // @ts-ignore - Access private property for debugging
+    const toolsMap = server._tools;
+    if (toolsMap) {
+      logger.error(`Registered tools: ${Array.from(toolsMap.keys()).join(", ")}`);
+      // Log the example tool definition to see the format
+      const exampleTool = toolsMap.get("calculate_sum");
+      if (exampleTool) {
+        logger.error(`Example tool definition: ${JSON.stringify(exampleTool, null, 2)}`);
+      }
+
+      // Log a sample tool definition to see the format
+      const sampleTool = toolsMap.get(Array.from(toolsMap.keys())[0]);
+      if (sampleTool) {
+        logger.error(`Sample tool definition: ${JSON.stringify(sampleTool, null, 2)}`);
+      }
+    } else {
+      logger.error("Could not access tools map for debugging");
+    }
+
+    logger.error("Tools and handlers registered successfully.");
+  } catch (registrationError) {
+    logger.error("ERROR during tool registration:", registrationError);
+    if (!isTestMode) {
+      // Exit if not in test mode
+      process.exit(1);
+    }
+  }
+}
+
+/**
  * Initializes the Reclaim MCP Server with the provided configuration.
  * - Sets up server info.
  * - Registers tool handlers and attempts to register metadata via server.tool.
@@ -71,7 +128,7 @@ export interface ServerConfig {
  * @param config - Optional configuration for server initialization
  * @returns The initialized server instance
  */
-export function initializeServer(config: ServerConfig = {}): McpServer {
+export function initializeServer(config: ServerConfig = {}): Server {
   const { isTestMode = false, apiKey = process.env.RECLAIM_API_KEY } = config;
   // Use injected apiClient if provided (for tests), otherwise use the default import
   const apiClient = config.apiClient || defaultApi;
@@ -85,33 +142,14 @@ export function initializeServer(config: ServerConfig = {}): McpServer {
     logger.error("Running in test mode with no API key or mock client.");
   }
 
-  const server = new McpServer(serverInfo);
+  const server = new Server(serverInfo);
   logger.error(`Server instance created for "${serverInfo.name}".`);
 
-  // 1. Register Tools (including handlers) directly
-  logger.error("Registering MCP tools and handlers...");
-  try {
-    // Pass the actual API client instance to the registration functions
-    registerTaskActionTools(server, apiClient);
-    registerTaskCrudTools(server, apiClient);
-    logger.error("Tools and handlers registered successfully.");
-  } catch (registrationError) {
-    logger.error("ERROR during tool registration:", registrationError);
-    if (!isTestMode) {
-      process.exit(1);
-    }
-    throw registrationError;
-  }
+  // Log SDK version for debugging
+  logSdkVersion();
 
-  // 2. Register Resources
-  logger.error("Registering MCP resources...");
-  registerTaskResources(server, apiClient); // Pass the API client here too
-  logger.error("Resources registered successfully.");
-
-  // 3. REMOVED Manual listTools handler - rely on server.tool (even if description is flawed)
-  // logger.error("Registering listTools request handler...");
-  // server.setRequestHandler(ListToolsRequestSchema, ...)
-  // logger.error("listTools request handler registered.");
+  // Register all tools with the server
+  registerServerTools(server, apiClient, isTestMode);
 
   return server;
 }
