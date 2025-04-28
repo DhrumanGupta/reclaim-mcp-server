@@ -10,7 +10,6 @@ import "dotenv/config"; // Load environment variables from .env file
 
 import { logger } from "./logger.js";
 import { registerTaskResources } from "./resources/tasks.js";
-import { registerExampleTool } from "./tools/example-tool.js";
 import { registerTaskActionTools } from "./tools/taskActions.js";
 import { registerTaskCrudTools } from "./tools/taskCrud.js";
 
@@ -79,10 +78,6 @@ function registerServerTools(
   isTestMode: boolean,
 ): void {
   try {
-    // Register example tool first (to test schema formatting)
-    logger.error("Registering example tool...");
-    registerExampleTool(server as unknown as McpServer);
-
     // Register task-related tools
     logger.error("Registering MCP tools and handlers...");
     registerTaskActionTools(server as unknown as McpServer, apiClient);
