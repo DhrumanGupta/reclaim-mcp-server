@@ -5,7 +5,7 @@
   "main": "./dist/index.js",
   "type": "module",
   "bin": {
-    "reclaim-mcp-server": "./dist/index.js"
+    "reclaim-mcp-server": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
