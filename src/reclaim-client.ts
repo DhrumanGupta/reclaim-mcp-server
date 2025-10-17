@@ -20,7 +20,7 @@ if (!TOKEN) {
   // Use console.error for fatal startup issues
   console.error("FATAL: RECLAIM_API_KEY environment variable is not set.");
   console.error(
-    "Please create a .env file in the project root with RECLAIM_API_KEY=your_api_token",
+    "Please create a .env file in the project root with RECLAIM_API_KEY=your_api_token"
   );
   process.exit(1); // Exit if the token is missing, essential for operation
 }
@@ -55,7 +55,7 @@ export const reclaim: AxiosInstance = axios.create({
  * @returns An ISO 8601 date/time string representing the calculated deadline.
  */
 export function parseDeadline(
-  deadlineInput: number | string | undefined,
+  deadlineInput: number | string | undefined
 ): string {
   const now = new Date();
   try {
@@ -63,7 +63,7 @@ export function parseDeadline(
       // Interpret number as days from now
       if (deadlineInput <= 0) {
         console.warn(
-          `Received non-positive number of days "${deadlineInput}" for deadline/snooze, using current time.`,
+          `Received non-positive number of days "${deadlineInput}" for deadline/snooze, using current time.`
         );
         // Or perhaps default to 24 hours? Let's default to now to avoid accidental pushing out.
         // throw new Error("Number of days must be positive.");
@@ -96,7 +96,7 @@ export function parseDeadline(
     console.error(
       `Failed to parse deadline/snooze input "${deadlineInput}", defaulting to 24 hours from now. Error: ${
         (error as Error).message
-      }`,
+      }`
     );
   }
 
@@ -124,7 +124,7 @@ export function parseDeadline(
 export function filterActiveTasks(tasks: Task[]): Task[] {
   if (!Array.isArray(tasks)) {
     console.error(
-      "filterActiveTasks received non-array input, returning empty array.",
+      "filterActiveTasks received non-array input, returning empty array."
     );
     return [];
   }
@@ -133,7 +133,7 @@ export function filterActiveTasks(tasks: Task[]): Task[] {
       task && // Ensure task object exists
       !task.deleted &&
       task.status !== "ARCHIVED" &&
-      task.status !== "CANCELLED",
+      task.status !== "CANCELLED"
   );
 }
 
@@ -146,7 +146,7 @@ export function filterActiveTasks(tasks: Task[]): Task[] {
  *
  * @param error - The error object caught from the Axios request (typed as unknown).
  * @param context - A string providing context for the API call (e.g., function name, parameters).
- * @throws {ReclaimError} Always throws a normalized ReclaimError.
+ * @throws {ReclaimError} Always throws a normalized ReclaimError with full error details.
  */
 const handleApiError = (error: unknown, context: string): never => {
   let status: number | undefined;
@@ -154,16 +154,23 @@ const handleApiError = (error: unknown, context: string): never => {
   let message: string;
 
   if (axios.isAxiosError(error)) {
-    const axiosError = error as AxiosError; // Already checked with isAxiosError
+    const axiosError = error as AxiosError;
     status = axiosError.response?.status;
-    detail = axiosError.response?.data;
+    detail = axiosError.response?.data; // Keep full API response body
+
     // Try to extract a meaningful message from the response data or fallback to Axios message
-    const responseData = detail; // Type assertion for easier access
+    const responseData = detail;
     message =
       responseData?.message || responseData?.title || axiosError.message;
+
+    // Enhanced logging with full error details
     console.error(
       `Reclaim API Error (${context}) - Status: ${status ?? "N/A"}`,
-      detail || axiosError.message,
+      detail || axiosError.message
+    );
+    console.error(
+      `[DEBUG] Full API Error Response:`,
+      JSON.stringify(detail, null, 2)
     );
   } else if (error instanceof Error) {
     message = error.message;
@@ -175,16 +182,15 @@ const handleApiError = (error: unknown, context: string): never => {
     detail = error; // Preserve the original thrown value
     console.error(
       `Unexpected throw during Reclaim API call (${context})`,
-      error,
+      error
     );
   }
 
-  // Throw a structured error for consistent handling upstream.
-  // The 'never' return type indicates this function *always* throws.
+  // Throw a structured error with FULL detail object for upstream handling
   throw new ReclaimError(
     `API Call Failed (${context}): ${message}`,
     status,
-    detail,
+    detail
   );
 };
 
@@ -232,10 +238,20 @@ export async function getTask(taskId: number): Promise<Task> {
 
 /**
  * Creates a new task in Reclaim using the provided data.
+ *
+ * **Auto-Applied Defaults** (if not provided in taskData):
+ * - `due`: 24 hours from now (if neither `deadline` nor `due` specified)
+ * - `timeChunksRequired`: 4 chunks (1 hour)
+ * - `eventCategory`: "WORK"
+ * - `minChunkSize`: 1 chunk (15 minutes)
+ * - `maxChunkSize`: Same as timeChunksRequired
+ * - `priority`: "P2" (medium priority)
+ *
+ * These defaults are required by the Reclaim API for proper task scheduling.
+ *
  * @param taskData - An object containing the properties for the new task. See `TaskInputData`.
- * `title` is typically required by the API. `due` will be generated if `deadline` is omitted.
  * @returns A promise resolving to the newly created Task object as returned by the API.
- * @throws {ReclaimError} If the API request fails (e.g., validation error - 400).
+ * @throws {ReclaimError} If the API request fails (e.g., validation error - 400, server error - 500).
  */
 export async function createTask(taskData: TaskInputData): Promise<Task> {
   const context = "createTask";
@@ -258,12 +274,54 @@ export async function createTask(taskData: TaskInputData): Promise<Task> {
       apiPayload.snoozeUntil = parseDeadline(apiPayload.snoozeUntil);
     }
 
+    // Set default timeChunksRequired if not provided (4 chunks = 1 hour)
+    // The Reclaim API may require this field even though it's marked optional
+    if (!apiPayload.timeChunksRequired) {
+      apiPayload.timeChunksRequired = 4; // 4 * 15 min = 1 hour default
+      console.error(
+        "[DEBUG] No timeChunksRequired specified, defaulting to 4 (1 hour)"
+      );
+    }
+
+    // Set default eventCategory if not provided (REQUIRED by Reclaim API)
+    // Tasks must be categorized as either WORK or PERSONAL
+    if (!apiPayload.eventCategory) {
+      apiPayload.eventCategory = "WORK";
+      console.error("[DEBUG] No eventCategory specified, defaulting to 'WORK'");
+    }
+
+    // Set default chunk size constraints if not provided
+    // These define the minimum and maximum time blocks for scheduling
+    if (!apiPayload.minChunkSize) {
+      apiPayload.minChunkSize = 1; // Minimum 1 chunk = 15 minutes
+      console.error("[DEBUG] No minChunkSize specified, defaulting to 1");
+    }
+    if (!apiPayload.maxChunkSize) {
+      apiPayload.maxChunkSize = apiPayload.timeChunksRequired || 4;
+      console.error(
+        `[DEBUG] No maxChunkSize specified, defaulting to ${apiPayload.maxChunkSize}`
+      );
+    }
+
+    // Set default priority if not provided
+    // P2 = medium priority (P1=highest, P4=lowest)
+    if (!apiPayload.priority) {
+      apiPayload.priority = "P2";
+      console.error("[DEBUG] No priority specified, defaulting to 'P2'");
+    }
+
     // Clean undefined keys before sending to API
     Object.keys(apiPayload).forEach((key) => {
       if ((apiPayload as any)[key] === undefined) {
         delete (apiPayload as any)[key];
       }
     });
+
+    // Debug logging: Log the exact payload being sent to Reclaim API
+    console.error(
+      `[DEBUG] Creating task with payload:`,
+      JSON.stringify(apiPayload, null, 2)
+    );
 
     const { data } = await reclaim.post<Task>("/tasks", apiPayload);
     return data;
@@ -283,7 +341,7 @@ export async function createTask(taskData: TaskInputData): Promise<Task> {
  */
 export async function updateTask(
   taskId: number,
-  taskData: TaskInputData,
+  taskData: TaskInputData
 ): Promise<Task> {
   const context = `updateTask(taskId=${taskId})`;
   try {
@@ -311,7 +369,7 @@ export async function updateTask(
     // Ensure we are actually sending some data to update
     if (Object.keys(apiPayload).length === 0) {
       console.warn(
-        `UpdateTask called for taskId ${taskId} with no fields to update. Skipping API call.`,
+        `UpdateTask called for taskId ${taskId} with no fields to update. Skipping API call.`
       );
       // Fetch and return the current task state as PATCH with no data is a no-op
       return getTask(taskId);
@@ -386,7 +444,7 @@ export async function markTaskIncomplete(taskId: number): Promise<any> {
  */
 export async function addTimeToTask(
   taskId: number,
-  minutes: number,
+  minutes: number
 ): Promise<any> {
   const context = `addTimeToTask(taskId=${taskId}, minutes=${minutes})`;
   if (minutes <= 0) {
@@ -400,7 +458,7 @@ export async function addTimeToTask(
       null,
       {
         params: { minutes },
-      },
+      }
     );
     return data ?? { success: true };
   } catch (error) {
@@ -451,7 +509,7 @@ export async function stopTaskTimer(taskId: number): Promise<any> {
 export async function logWorkForTask(
   taskId: number,
   minutes: number,
-  end?: string,
+  end?: string
 ): Promise<any> {
   const context = `logWorkForTask(taskId=${taskId}, minutes=${minutes}, end=${end ?? "now"})`;
   if (minutes <= 0) {
@@ -477,7 +535,7 @@ export async function logWorkForTask(
       const message =
         dateError instanceof Error ? dateError.message : String(dateError);
       throw new Error(
-        `Invalid 'end' date format: "${end}". Error: ${message}. Please use ISO 8601 or YYYY-MM-DD format.`,
+        `Invalid 'end' date format: "${end}". Error: ${message}. Please use ISO 8601 or YYYY-MM-DD format.`
       );
     }
   }
@@ -486,7 +544,7 @@ export async function logWorkForTask(
     const { data } = await reclaim.post(
       `/planner/log-work/task/${taskId}`,
       null,
-      { params },
+      { params }
     );
     return data ?? { success: true };
   } catch (error) {
@@ -504,7 +562,7 @@ export async function clearTaskExceptions(taskId: number): Promise<any> {
   const context = `clearTaskExceptions(taskId=${taskId})`;
   try {
     const { data } = await reclaim.post(
-      `/planner/clear-exceptions/task/${taskId}`,
+      `/planner/clear-exceptions/task/${taskId}`
     );
     return data ?? { success: true };
   } catch (error) {

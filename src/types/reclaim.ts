@@ -77,9 +77,10 @@ export interface TaskInputData {
   eventColor?: string; // e.g., "LAVENDER", "SAGE", ...
   /** Used internally by API client, represents the ISO string for the deadline. Do not set directly if using `deadline`. */
   due?: string;
-  // Other potential fields for create/update - check API if needed
-  // minChunkSize?: number;
-  // maxChunkSize?: number;
+  /** Minimum chunk size for task scheduling (in 15-min increments). Controls smallest time block for this task. */
+  minChunkSize?: number;
+  /** Maximum chunk size for task scheduling (in 15-min increments). Controls largest time block for this task. */
+  maxChunkSize?: number;
 }
 
 /**

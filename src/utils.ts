@@ -19,7 +19,7 @@ import type {
  * @returns A Promise resolving to the SDK's `CallToolResult`.
  */
 export async function wrapApiCall(
-  promise: Promise<unknown>,
+  promise: Promise<unknown>
 ): Promise<CallToolResult> {
   try {
     const result = await promise;
@@ -67,56 +67,45 @@ export async function wrapApiCall(
       errorDetail = e; // Preserve the original thrown value
     }
 
-    // Log the detailed error server-side for debugging - CHANGED TO CONSOLE.ERROR
+    // Log the detailed error server-side for debugging
     console.error(`MCP Tool Error: ${errorMessage}`, {
       code: errorCode,
       detail: errorDetail,
     });
 
-    // Construct a user-friendly error message for the ToolResult
+    // Construct a comprehensive error message for the ToolResult
     let userMessage = `Error: ${errorMessage}`;
+
     // Append status code if available
     if (errorCode) {
       userMessage = `Error ${errorCode}: ${errorMessage}`;
     }
 
-    // Try to add more context from the detail if it's simple
-    let detailString: string | undefined;
-    if (errorDetail && typeof errorDetail === "object") {
-      if (errorDetail.title && typeof errorDetail.title === "string")
-        userMessage += ` - ${errorDetail.title}`;
-      // Avoid overly verbose details; focus on actionable messages if possible
-      if (
-        errorDetail.detail &&
-        typeof errorDetail.detail === "string" &&
-        errorDetail.detail.length < 150
-      ) {
-        detailString = errorDetail.detail;
-      } else if (
-        errorDetail.message &&
-        typeof errorDetail.message === "string" &&
-        errorDetail.message !== errorMessage
-      ) {
-        // Sometimes detail has its own message property
-        detailString = errorDetail.message;
-      }
-    } else if (typeof errorDetail === "string" && errorDetail.length < 150) {
-      // Include simple string details if they aren't the main message
-      if (errorDetail !== errorMessage) {
-        detailString = errorDetail;
-      }
-    }
+    // ENHANCED: Include full API error detail in response for debugging
+    // This allows users/LLMs to see exactly what the API said
+    const contentParts: TextContent[] = [{ type: "text", text: userMessage }];
 
-    if (detailString) {
-      userMessage += ` (${detailString})`;
+    if (errorDetail) {
+      try {
+        // Add full error detail as a separate content block
+        const detailJson = JSON.stringify(errorDetail, null, 2);
+        contentParts.push({
+          type: "text",
+          text: `\n\nAPI Error Details:\n${detailJson}`,
+        });
+      } catch (stringifyError) {
+        // Fallback if detail can't be stringified (circular refs, etc.)
+        contentParts.push({
+          type: "text",
+          text: `\n\nAPI Error Details: [Unable to serialize error detail]`,
+        });
+      }
     }
 
     // Return the error structure for MCP, using TextContent
     return {
       isError: true,
-      content: [{ type: "text", text: userMessage }],
-      // Future enhancement: Could include structured error data if MCP spec evolves
-      // _meta: { errorData: { code: errorCode, message: errorMessage, detail: errorDetail } }
+      content: contentParts,
     };
   }
 }
