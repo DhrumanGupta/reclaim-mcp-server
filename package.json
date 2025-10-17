@@ -1,6 +1,6 @@
 {
-  "name": "reclaim-mcp-server",
-  "version": "0.1.2",
+  "name": "@berlm/reclaim-mcp-server",
+  "version": "0.0.1",
   "description": "A Model Context Protocol (MCP) server for interacting with Reclaim.ai tasks.",
   "main": "./dist/index.js",
   "type": "module",
@@ -38,16 +38,19 @@
     "ai",
     "automation"
   ],
-  "author": "John J. Hughes, III",
+  "author": "Dhruman Gupta",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jj3ny/reclaim-mcp-server.git"
+    "url": "git+https://github.com/DhrumanGupta/reclaim-mcp-server.git"
   },
   "bugs": {
-    "url": "https://github.com/jj3ny/reclaim-mcp-server/issues"
+    "url": "https://github.com/DhrumanGupta/reclaim-mcp-server/issues"
   },
-  "homepage": "https://github.com/jj3ny/reclaim-mcp-server#readme",
+  "homepage": "https://github.com/DhrumanGupta/reclaim-mcp-server#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.10.1",
     "axios": "^1.8.4",

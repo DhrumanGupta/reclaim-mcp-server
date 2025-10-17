@@ -62,13 +62,13 @@ A community‑maintained [**Model Context Protocol**](https://modelcontextprotoc
    - [Reclaim API key](https://app.reclaim.ai/settings/developer)
 
 2. **Claude Desktop configuration (minimal)**
-   ```json
+```json
 {
   "mcpServers": {
     "reclaim": {
       "command": "npx",
       "args": [
-        "reclaim-mcp-server"
+        "@berlm/reclaim-mcp-server"
       ],
       "env": { "RECLAIM_API_KEY": "xxx" }
     }
@@ -98,15 +98,15 @@ A community‑maintained [**Model Context Protocol**](https://modelcontextprotoc
 If you prefer to install from source:
 
 ```bash
-git clone https://github.com/jj3ny/reclaim-mcp-server.git
+git clone https://github.com/DhrumanGupta/reclaim-mcp-server.git
 cd reclaim-mcp-server
-pnpm install && pnpm build
+npm install && npm run build
 
 # Run with your API key
-RECLAIM_API_KEY=your_api_key node dist/index.js
+RECLAIM_API_KEY=your_api_key npm run start
 ```
 
-## 🤝 Contributing
+## 🤝 Contributing  
 
 Bug reports & PRs welcome! To contribute:
 
