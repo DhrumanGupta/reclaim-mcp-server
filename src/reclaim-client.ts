@@ -7,11 +7,7 @@ import axios, { type AxiosError, type AxiosInstance } from "axios";
 import "dotenv/config";
 
 // Fixed import path with .js extension
-import {
-  ReclaimError,
-  type Task,
-  type TaskInputData,
-} from "./types/reclaim.js";
+import { ReclaimError, type Task, type TaskInputData } from "./types/reclaim.js";
 
 // --- Configuration ---
 
@@ -20,7 +16,7 @@ if (!TOKEN) {
   // Use console.error for fatal startup issues
   console.error("FATAL: RECLAIM_API_KEY environment variable is not set.");
   console.error(
-    "Please create a .env file in the project root with RECLAIM_API_KEY=your_api_token"
+    "Please create a .env file in the project root with RECLAIM_API_KEY=your_api_token",
   );
   process.exit(1); // Exit if the token is missing, essential for operation
 }
@@ -34,9 +30,9 @@ if (!TOKEN) {
 export const reclaim: AxiosInstance = axios.create({
   baseURL: "https://api.app.reclaim.ai/api/",
   headers: {
-    Authorization: `Bearer ${TOKEN}`,
+    "Authorization": `Bearer ${TOKEN}`,
     "Content-Type": "application/json",
-    Accept: "application/json", // Explicitly accept JSON responses
+    "Accept": "application/json", // Explicitly accept JSON responses
   },
   // Optional: Add a timeout for requests
   // timeout: 10000, // 10 seconds
@@ -54,16 +50,14 @@ export const reclaim: AxiosInstance = axios.create({
  * an ISO 8601 date/time string, or undefined.
  * @returns An ISO 8601 date/time string representing the calculated deadline.
  */
-export function parseDeadline(
-  deadlineInput: number | string | undefined
-): string {
+export function parseDeadline(deadlineInput: number | string | undefined): string {
   const now = new Date();
   try {
     if (typeof deadlineInput === "number") {
       // Interpret number as days from now
       if (deadlineInput <= 0) {
         console.warn(
-          `Received non-positive number of days "${deadlineInput}" for deadline/snooze, using current time.`
+          `Received non-positive number of days "${deadlineInput}" for deadline/snooze, using current time.`,
         );
         // Or perhaps default to 24 hours? Let's default to now to avoid accidental pushing out.
         // throw new Error("Number of days must be positive.");
@@ -96,7 +90,7 @@ export function parseDeadline(
     console.error(
       `Failed to parse deadline/snooze input "${deadlineInput}", defaulting to 24 hours from now. Error: ${
         (error as Error).message
-      }`
+      }`,
     );
   }
 
@@ -123,9 +117,7 @@ export function parseDeadline(
  */
 export function filterActiveTasks(tasks: Task[]): Task[] {
   if (!Array.isArray(tasks)) {
-    console.error(
-      "filterActiveTasks received non-array input, returning empty array."
-    );
+    console.error("filterActiveTasks received non-array input, returning empty array.");
     return [];
   }
   return tasks.filter(
@@ -133,7 +125,7 @@ export function filterActiveTasks(tasks: Task[]): Task[] {
       task && // Ensure task object exists
       !task.deleted &&
       task.status !== "ARCHIVED" &&
-      task.status !== "CANCELLED"
+      task.status !== "CANCELLED",
   );
 }
 
@@ -160,18 +152,14 @@ const handleApiError = (error: unknown, context: string): never => {
 
     // Try to extract a meaningful message from the response data or fallback to Axios message
     const responseData = detail;
-    message =
-      responseData?.message || responseData?.title || axiosError.message;
+    message = responseData?.message || responseData?.title || axiosError.message;
 
     // Enhanced logging with full error details
     console.error(
       `Reclaim API Error (${context}) - Status: ${status ?? "N/A"}`,
-      detail || axiosError.message
+      detail || axiosError.message,
     );
-    console.error(
-      `[DEBUG] Full API Error Response:`,
-      JSON.stringify(detail, null, 2)
-    );
+    console.error(`[DEBUG] Full API Error Response:`, JSON.stringify(detail, null, 2));
   } else if (error instanceof Error) {
     message = error.message;
     detail = { stack: error.stack }; // Include stack for non-API errors
@@ -180,18 +168,11 @@ const handleApiError = (error: unknown, context: string): never => {
     // Handle cases where something other than an Error was thrown
     message = "An unexpected error occurred during API call.";
     detail = error; // Preserve the original thrown value
-    console.error(
-      `Unexpected throw during Reclaim API call (${context})`,
-      error
-    );
+    console.error(`Unexpected throw during Reclaim API call (${context})`, error);
   }
 
   // Throw a structured error with FULL detail object for upstream handling
-  throw new ReclaimError(
-    `API Call Failed (${context}): ${message}`,
-    status,
-    detail
-  );
+  throw new ReclaimError(`API Call Failed (${context}): ${message}`, status, detail);
 };
 
 /**
@@ -278,9 +259,7 @@ export async function createTask(taskData: TaskInputData): Promise<Task> {
     // The Reclaim API may require this field even though it's marked optional
     if (!apiPayload.timeChunksRequired) {
       apiPayload.timeChunksRequired = 4; // 4 * 15 min = 1 hour default
-      console.error(
-        "[DEBUG] No timeChunksRequired specified, defaulting to 4 (1 hour)"
-      );
+      console.error("[DEBUG] No timeChunksRequired specified, defaulting to 4 (1 hour)");
     }
 
     // Set default eventCategory if not provided (REQUIRED by Reclaim API)
@@ -298,9 +277,7 @@ export async function createTask(taskData: TaskInputData): Promise<Task> {
     }
     if (!apiPayload.maxChunkSize) {
       apiPayload.maxChunkSize = apiPayload.timeChunksRequired || 4;
-      console.error(
-        `[DEBUG] No maxChunkSize specified, defaulting to ${apiPayload.maxChunkSize}`
-      );
+      console.error(`[DEBUG] No maxChunkSize specified, defaulting to ${apiPayload.maxChunkSize}`);
     }
 
     // Set default priority if not provided
@@ -318,10 +295,7 @@ export async function createTask(taskData: TaskInputData): Promise<Task> {
     });
 
     // Debug logging: Log the exact payload being sent to Reclaim API
-    console.error(
-      `[DEBUG] Creating task with payload:`,
-      JSON.stringify(apiPayload, null, 2)
-    );
+    console.error(`[DEBUG] Creating task with payload:`, JSON.stringify(apiPayload, null, 2));
 
     const { data } = await reclaim.post<Task>("/tasks", apiPayload);
     return data;
@@ -339,10 +313,7 @@ export async function createTask(taskData: TaskInputData): Promise<Task> {
  * @returns A promise resolving to the updated Task object as returned by the API.
  * @throws {ReclaimError} If the API request fails (e.g., task not found - 404, validation error - 400).
  */
-export async function updateTask(
-  taskId: number,
-  taskData: TaskInputData
-): Promise<Task> {
+export async function updateTask(taskId: number, taskData: TaskInputData): Promise<Task> {
   const context = `updateTask(taskId=${taskId})`;
   try {
     // API expects 'due', not 'deadline'. parseDeadline handles conversion.
@@ -369,7 +340,7 @@ export async function updateTask(
     // Ensure we are actually sending some data to update
     if (Object.keys(apiPayload).length === 0) {
       console.warn(
-        `UpdateTask called for taskId ${taskId} with no fields to update. Skipping API call.`
+        `UpdateTask called for taskId ${taskId} with no fields to update. Skipping API call.`,
       );
       // Fetch and return the current task state as PATCH with no data is a no-op
       return getTask(taskId);
@@ -442,10 +413,7 @@ export async function markTaskIncomplete(taskId: number): Promise<any> {
  * @returns A promise resolving to the API response. Use `any` for flexibility.
  * @throws {ReclaimError} If the API request fails or minutes is invalid.
  */
-export async function addTimeToTask(
-  taskId: number,
-  minutes: number
-): Promise<any> {
+export async function addTimeToTask(taskId: number, minutes: number): Promise<any> {
   const context = `addTimeToTask(taskId=${taskId}, minutes=${minutes})`;
   if (minutes <= 0) {
     // Throw an error immediately for invalid input, handled by wrapApiCall later
@@ -453,13 +421,9 @@ export async function addTimeToTask(
   }
   try {
     // API expects minutes as a query parameter
-    const { data } = await reclaim.post(
-      `/planner/add-time/task/${taskId}`,
-      null,
-      {
-        params: { minutes },
-      }
-    );
+    const { data } = await reclaim.post(`/planner/add-time/task/${taskId}`, null, {
+      params: { minutes },
+    });
     return data ?? { success: true };
   } catch (error) {
     return handleApiError(error, context);
@@ -506,11 +470,7 @@ export async function stopTaskTimer(taskId: number): Promise<any> {
  * @returns A promise resolving to the API response. Use `any` for flexibility.
  * @throws {ReclaimError} If the API request fails or parameters are invalid.
  */
-export async function logWorkForTask(
-  taskId: number,
-  minutes: number,
-  end?: string
-): Promise<any> {
+export async function logWorkForTask(taskId: number, minutes: number, end?: string): Promise<any> {
   const context = `logWorkForTask(taskId=${taskId}, minutes=${minutes}, end=${end ?? "now"})`;
   if (minutes <= 0) {
     throw new Error("Minutes must be positive to log work.");
@@ -532,20 +492,15 @@ export async function logWorkForTask(
       }
     } catch (dateError: unknown) {
       // Throw a more specific error if parsing fails
-      const message =
-        dateError instanceof Error ? dateError.message : String(dateError);
+      const message = dateError instanceof Error ? dateError.message : String(dateError);
       throw new Error(
-        `Invalid 'end' date format: "${end}". Error: ${message}. Please use ISO 8601 or YYYY-MM-DD format.`
+        `Invalid 'end' date format: "${end}". Error: ${message}. Please use ISO 8601 or YYYY-MM-DD format.`,
       );
     }
   }
 
   try {
-    const { data } = await reclaim.post(
-      `/planner/log-work/task/${taskId}`,
-      null,
-      { params }
-    );
+    const { data } = await reclaim.post(`/planner/log-work/task/${taskId}`, null, { params });
     return data ?? { success: true };
   } catch (error) {
     return handleApiError(error, context);
@@ -561,9 +516,7 @@ export async function logWorkForTask(
 export async function clearTaskExceptions(taskId: number): Promise<any> {
   const context = `clearTaskExceptions(taskId=${taskId})`;
   try {
-    const { data } = await reclaim.post(
-      `/planner/clear-exceptions/task/${taskId}`
-    );
+    const { data } = await reclaim.post(`/planner/clear-exceptions/task/${taskId}`);
     return data ?? { success: true };
   } catch (error) {
     return handleApiError(error, context);

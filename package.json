@@ -14,7 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint --ext .ts src --max-warnings 0 --cache --cache-location node_modules/.cache/eslint/",
-    "lint:fix": "pnpm lint --fix",
+    "lint:fix": "npm lint --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",

@@ -19,14 +19,8 @@ import type { TaskInputData } from "../types/reclaim.js";
 export function registerTaskCrudTools(server: McpServer): void {
   // --- Zod Schema for Task Properties (used in both create and update) ---
   const taskPropertiesSchema = z.object({
-    title: z
-      .string()
-      .min(1, "Title cannot be empty.")
-      .describe("Task title/name (required)"),
-    notes: z
-      .string()
-      .optional()
-      .describe("Additional notes or description for the task"),
+    title: z.string().min(1, "Title cannot be empty.").describe("Task title/name (required)"),
+    notes: z.string().optional().describe("Additional notes or description for the task"),
     eventCategory: z
       .enum(["WORK", "PERSONAL"])
       .optional()
@@ -34,9 +28,7 @@ export function registerTaskCrudTools(server: McpServer): void {
     eventSubType: z
       .string()
       .optional()
-      .describe(
-        'Event subtype (e.g., "MEETING", "FOCUS"). Usually auto-assigned by Reclaim.'
-      ),
+      .describe('Event subtype (e.g., "MEETING", "FOCUS"). Usually auto-assigned by Reclaim.'),
     priority: z
       .enum(["P1", "P2", "P3", "P4"])
       .optional()
@@ -47,23 +39,14 @@ export function registerTaskCrudTools(server: McpServer): void {
       .positive("Time chunks must be a positive integer.")
       .optional()
       .describe(
-        "Duration in 15-minute chunks. 1 chunk = 15 minutes, 4 chunks = 1 hour, 8 chunks = 2 hours. Default: 4 (1 hour)"
+        "Duration in 15-minute chunks. 1 chunk = 15 minutes, 4 chunks = 1 hour, 8 chunks = 2 hours. Default: 4 (1 hour)",
       ),
     onDeck: z
       .boolean()
       .optional()
-      .describe(
-        "Mark task as high priority 'on deck' for immediate scheduling"
-      ),
+      .describe("Mark task as high priority 'on deck' for immediate scheduling"),
     status: z
-      .enum([
-        "NEW",
-        "SCHEDULED",
-        "IN_PROGRESS",
-        "COMPLETE",
-        "CANCELLED",
-        "ARCHIVED",
-      ])
+      .enum(["NEW", "SCHEDULED", "IN_PROGRESS", "COMPLETE", "CANCELLED", "ARCHIVED"])
       .optional()
       .describe("Task status (usually auto-managed by Reclaim)"),
     deadline: z
@@ -78,7 +61,7 @@ export function registerTaskCrudTools(server: McpServer): void {
       ])
       .optional()
       .describe(
-        'Task deadline. Formats: ISO 8601 with timezone (e.g., "2025-10-18T14:30:00Z"), date only (e.g., "2025-10-18"), or number of days from now. Default: 1 day from now'
+        'Task deadline. Formats: ISO 8601 with timezone (e.g., "2025-10-18T14:30:00Z"), date only (e.g., "2025-10-18"), or number of days from now. Default: 1 day from now',
       ),
     snoozeUntil: z
       .union([
@@ -92,7 +75,7 @@ export function registerTaskCrudTools(server: McpServer): void {
       ])
       .optional()
       .describe(
-        "Snooze task until this date/time. Same format options as deadline. Task will not be scheduled until this time."
+        "Snooze task until this date/time. Same format options as deadline. Task will not be scheduled until this time.",
       ),
     eventColor: z
       .enum([
@@ -117,10 +100,7 @@ export function registerTaskCrudTools(server: McpServer): void {
   // We'll do strict validation inside the handler to return user-friendly ToolResults
   const createTaskSchemaForSdk = {
     title: z.string().describe("Task title/name (required)"),
-    notes: z
-      .string()
-      .optional()
-      .describe("Additional notes or description for the task"),
+    notes: z.string().optional().describe("Additional notes or description for the task"),
     eventCategory: z
       .enum(["WORK", "PERSONAL"])
       .optional()
@@ -128,9 +108,7 @@ export function registerTaskCrudTools(server: McpServer): void {
     eventSubType: z
       .string()
       .optional()
-      .describe(
-        'Event subtype (e.g., "MEETING", "FOCUS"). Usually auto-assigned by Reclaim.'
-      ),
+      .describe('Event subtype (e.g., "MEETING", "FOCUS"). Usually auto-assigned by Reclaim.'),
     priority: z
       .enum(["P1", "P2", "P3", "P4"])
       .optional()
@@ -140,23 +118,14 @@ export function registerTaskCrudTools(server: McpServer): void {
       .int()
       .optional()
       .describe(
-        "Duration in 15-minute chunks. 1 chunk = 15 minutes, 4 chunks = 1 hour, 8 chunks = 2 hours. Default: 4 (1 hour)"
+        "Duration in 15-minute chunks. 1 chunk = 15 minutes, 4 chunks = 1 hour, 8 chunks = 2 hours. Default: 4 (1 hour)",
       ),
     onDeck: z
       .boolean()
       .optional()
-      .describe(
-        "Mark task as high priority 'on deck' for immediate scheduling"
-      ),
+      .describe("Mark task as high priority 'on deck' for immediate scheduling"),
     status: z
-      .enum([
-        "NEW",
-        "SCHEDULED",
-        "IN_PROGRESS",
-        "COMPLETE",
-        "CANCELLED",
-        "ARCHIVED",
-      ])
+      .enum(["NEW", "SCHEDULED", "IN_PROGRESS", "COMPLETE", "CANCELLED", "ARCHIVED"])
       .optional()
       .describe("Task status (usually auto-managed by Reclaim)"),
     // PERMISSIVE: Accept any string for deadline (strict validation in handler)
@@ -164,14 +133,14 @@ export function registerTaskCrudTools(server: McpServer): void {
       .union([z.number().int(), z.string()])
       .optional()
       .describe(
-        'Task deadline. Formats: ISO 8601 with timezone (e.g., "2025-10-18T14:30:00Z"), date only (e.g., "2025-10-18"), or number of days from now. Default: 1 day from now'
+        'Task deadline. Formats: ISO 8601 with timezone (e.g., "2025-10-18T14:30:00Z"), date only (e.g., "2025-10-18"), or number of days from now. Default: 1 day from now',
       ),
     // PERMISSIVE: Accept any string for snoozeUntil (strict validation in handler)
     snoozeUntil: z
       .union([z.number().int(), z.string()])
       .optional()
       .describe(
-        "Snooze task until this date/time. Same format options as deadline. Task will not be scheduled until this time."
+        "Snooze task until this date/time. Same format options as deadline. Task will not be scheduled until this time.",
       ),
     eventColor: z
       .enum([
@@ -216,7 +185,7 @@ export function registerTaskCrudTools(server: McpServer): void {
 
       // Validation succeeded, proceed with API call
       return wrapApiCall(api.createTask(validation.data as TaskInputData));
-    }
+    },
   );
 
   // --- UPDATE Task Tool ---
@@ -227,20 +196,13 @@ export function registerTaskCrudTools(server: McpServer): void {
       .int()
       .positive("Task ID must be a positive integer.")
       .describe("The unique ID of the task to update (required)"),
-    title: z
-      .string()
-      .min(1, "Title cannot be empty.")
-      .optional()
-      .describe("New task title/name"),
+    title: z.string().min(1, "Title cannot be empty.").optional().describe("New task title/name"),
     notes: z.string().optional().describe("New notes or description"),
     eventCategory: z
       .enum(["WORK", "PERSONAL"])
       .optional()
       .describe("New task category: WORK or PERSONAL"),
-    eventSubType: z
-      .string()
-      .optional()
-      .describe('New event subtype (e.g., "MEETING", "FOCUS")'),
+    eventSubType: z.string().optional().describe('New event subtype (e.g., "MEETING", "FOCUS")'),
     priority: z
       .enum(["P1", "P2", "P3", "P4"])
       .optional()
@@ -251,21 +213,11 @@ export function registerTaskCrudTools(server: McpServer): void {
       .positive("Time chunks must be a positive integer.")
       .optional()
       .describe(
-        "New duration in 15-minute chunks. 1 chunk = 15 min, 4 chunks = 1 hour, 8 chunks = 2 hours"
+        "New duration in 15-minute chunks. 1 chunk = 15 min, 4 chunks = 1 hour, 8 chunks = 2 hours",
       ),
-    onDeck: z
-      .boolean()
-      .optional()
-      .describe("Mark/unmark task as 'on deck' for prioritization"),
+    onDeck: z.boolean().optional().describe("Mark/unmark task as 'on deck' for prioritization"),
     status: z
-      .enum([
-        "NEW",
-        "SCHEDULED",
-        "IN_PROGRESS",
-        "COMPLETE",
-        "CANCELLED",
-        "ARCHIVED",
-      ])
+      .enum(["NEW", "SCHEDULED", "IN_PROGRESS", "COMPLETE", "CANCELLED", "ARCHIVED"])
       .optional()
       .describe("New task status"),
     deadline: z
@@ -280,7 +232,7 @@ export function registerTaskCrudTools(server: McpServer): void {
       ])
       .optional()
       .describe(
-        'New deadline. Formats: ISO 8601 with timezone (e.g., "2025-10-18T14:30:00Z"), date only (e.g., "2025-10-18"), or number of days from now'
+        'New deadline. Formats: ISO 8601 with timezone (e.g., "2025-10-18T14:30:00Z"), date only (e.g., "2025-10-18"), or number of days from now',
       ),
     snoozeUntil: z
       .union([
@@ -319,20 +271,13 @@ export function registerTaskCrudTools(server: McpServer): void {
       .int()
       .positive("Task ID must be a positive integer.")
       .describe("The unique ID of the task to update (required)"),
-    title: z
-      .string()
-      .min(1, "Title cannot be empty.")
-      .optional()
-      .describe("New task title/name"),
+    title: z.string().min(1, "Title cannot be empty.").optional().describe("New task title/name"),
     notes: z.string().optional().describe("New notes or description"),
     eventCategory: z
       .enum(["WORK", "PERSONAL"])
       .optional()
       .describe("New task category: WORK or PERSONAL"),
-    eventSubType: z
-      .string()
-      .optional()
-      .describe('New event subtype (e.g., "MEETING", "FOCUS")'),
+    eventSubType: z.string().optional().describe('New event subtype (e.g., "MEETING", "FOCUS")'),
     priority: z
       .enum(["P1", "P2", "P3", "P4"])
       .optional()
@@ -342,21 +287,11 @@ export function registerTaskCrudTools(server: McpServer): void {
       .int()
       .optional()
       .describe(
-        "New duration in 15-minute chunks. 1 chunk = 15 min, 4 chunks = 1 hour, 8 chunks = 2 hours"
+        "New duration in 15-minute chunks. 1 chunk = 15 min, 4 chunks = 1 hour, 8 chunks = 2 hours",
       ),
-    onDeck: z
-      .boolean()
-      .optional()
-      .describe("Mark/unmark task as 'on deck' for prioritization"),
+    onDeck: z.boolean().optional().describe("Mark/unmark task as 'on deck' for prioritization"),
     status: z
-      .enum([
-        "NEW",
-        "SCHEDULED",
-        "IN_PROGRESS",
-        "COMPLETE",
-        "CANCELLED",
-        "ARCHIVED",
-      ])
+      .enum(["NEW", "SCHEDULED", "IN_PROGRESS", "COMPLETE", "CANCELLED", "ARCHIVED"])
       .optional()
       .describe("New task status"),
     // PERMISSIVE: Accept any string for deadline (strict validation in handler)
@@ -364,7 +299,7 @@ export function registerTaskCrudTools(server: McpServer): void {
       .union([z.number().int(), z.string()])
       .optional()
       .describe(
-        'New deadline. Formats: ISO 8601 with timezone (e.g., "2025-10-18T14:30:00Z"), date only (e.g., "2025-10-18"), or number of days from now'
+        'New deadline. Formats: ISO 8601 with timezone (e.g., "2025-10-18T14:30:00Z"), date only (e.g., "2025-10-18"), or number of days from now',
       ),
     // PERMISSIVE: Accept any string for snoozeUntil (strict validation in handler)
     snoozeUntil: z
@@ -431,6 +366,6 @@ export function registerTaskCrudTools(server: McpServer): void {
 
       // Cast updateData to TaskInputData for the API client
       return wrapApiCall(api.updateTask(taskId, updateData as TaskInputData));
-    }
+    },
   );
 }
